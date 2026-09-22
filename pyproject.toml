@@ -1,0 +1,15 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "someip-can-project"
+version = "0.0.0"
+description = "AI-assisted automotive software platform skeleton"
+requires-python = ">=3.10"
+
+[tool.pytest.ini_options]
+testpaths = ["tests/python"]
+markers = [
+    "integration: requires configured vCAN and middleware services",
+]
