@@ -7,4 +7,4 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(CTest)
 
-# Component targets and C++ tests will be added with their implementations.
+add_subdirectory(cpp/can_gateway)
