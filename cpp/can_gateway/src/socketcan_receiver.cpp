@@ -1,4 +1,8 @@
+#include "can_gateway/can_frame.hpp"
 #include "can_gateway/frame_format.hpp"
+#include "can_gateway/signal_decoder.hpp"
+#include "vehicle_service/vehicle_data_format.hpp"
+#include "vehicle_service/vehicle_service.hpp"
 
 #include <cerrno>
 #include <chrono>
@@ -57,6 +61,8 @@ int run(const std::string& interface_name) {
         return 1;
     }
 
+    const can_gateway::SignalDecoder decoder;
+    vehicle_service::VehicleService service;
     while (running) {
         can_frame frame{};
         const auto bytes = recv(socket_fd, &frame, sizeof(frame), 0);
@@ -76,8 +82,20 @@ int run(const std::string& interface_name) {
         if ((frame.can_id & (CAN_EFF_FLAG | CAN_ERR_FLAG | CAN_RTR_FLAG)) != 0) {
             continue;
         }
-        std::cout << can_gateway::format_frame(frame, std::chrono::system_clock::now())
-                  << std::endl;
+        const auto received_at = std::chrono::system_clock::now();
+        std::cout << can_gateway::format_frame(frame, received_at) << std::endl;
+
+        can_gateway::CanFrame domain_frame{};
+        domain_frame.id = frame.can_id & CAN_SFF_MASK;
+        domain_frame.dlc = frame.can_dlc;
+        domain_frame.received_at = received_at;
+        for (unsigned int i = 0; i < frame.can_dlc && i < CAN_MAX_DLEN; ++i) {
+            domain_frame.payload[i] = frame.data[i];
+        }
+        if (const auto vehicle_data = decoder.decode(domain_frame)) {
+            service.update(*vehicle_data);
+            std::cout << vehicle_service::format_vehicle_data(*service.latest()) << std::endl;
+        }
     }
 
     close(socket_fd);

@@ -1,6 +1,6 @@
 # Development
 
-Linux/WSL is the primary development environment. Milestone 1 uses `vcan0`; the future receiver and simulator should accept a configurable interface name for later physical CAN use.
+Linux/WSL is the primary development environment. Milestone 1 uses `vcan0`; the receiver and simulator accept a configurable interface name. Physical CAN testing is outside this milestone.
 
 ## Build and checks
 
@@ -42,7 +42,9 @@ Start the virtual ECU in another terminal:
 PYTHONPATH=python python3 -m virtual_ecu --interface vcan0 --interval 1.0
 ```
 
-Both default to `vcan0` when `--interface` is omitted. Press Ctrl+C to stop each process. To run the opt-in integration test after building:
+Both default to `vcan0` when `--interface` is omitted. Press Ctrl+C to stop each process. For each valid `0x100` frame, the receiver prints a raw frame line followed by a line containing vehicle speed, RPM, and coolant temperature. The temporary layout is documented in [interfaces](interfaces.md).
+
+To run the opt-in integration test after building:
 
 ```sh
 python3 -m pytest tests/integration -m integration

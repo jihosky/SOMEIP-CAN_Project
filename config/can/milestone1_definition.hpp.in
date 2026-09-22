@@ -1,0 +1,18 @@
+#pragma once
+
+#include <cstdint>
+
+namespace milestone1_definition {
+
+constexpr std::uint32_t can_id = @M1_CAN_ID@;
+constexpr std::uint8_t dlc = @M1_DLC@;
+constexpr std::uint8_t speed_start = @M1_SPEED_START@;
+constexpr std::uint8_t speed_length = @M1_SPEED_LENGTH@;
+constexpr double speed_scale = @M1_SPEED_SCALE@;
+constexpr std::uint8_t rpm_start = @M1_RPM_START@;
+constexpr std::uint8_t rpm_length = @M1_RPM_LENGTH@;
+constexpr std::uint8_t temperature_start = @M1_TEMP_START@;
+constexpr std::uint8_t temperature_length = @M1_TEMP_LENGTH@;
+constexpr int temperature_offset = @M1_TEMP_OFFSET@;
+
+}  // namespace milestone1_definition

@@ -1,0 +1,8 @@
+{
+  "can_id": 256,
+  "dlc": 8,
+  "byte_order": "little",
+  "vehicle_speed": {"start": 0, "length": 2, "scale": 0.01, "offset": 0},
+  "engine_rpm": {"start": 2, "length": 2, "scale": 1, "offset": 0},
+  "coolant_temperature": {"start": 4, "length": 1, "scale": 1, "offset": -40}
+}

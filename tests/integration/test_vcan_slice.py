@@ -8,7 +8,6 @@ import subprocess
 import sys
 import time
 
-import can
 import pytest
 
 
@@ -31,10 +30,10 @@ def test_virtual_ecu_reaches_socketcan_receiver():
         [str(receiver), "--interface", interface],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        text=True,
+        text=False,
     )
     sender_process = None
-    output = []
+    output = bytearray()
     try:
         sender_process = subprocess.Popen(
             command,
@@ -46,14 +45,13 @@ def test_virtual_ecu_reaches_socketcan_receiver():
         deadline = time.monotonic() + 5
         while time.monotonic() < deadline:
             if receiver_process.poll() is not None:
-                pytest.fail(f"receiver exited: {receiver_process.stderr.read()}")
+                pytest.fail(f"receiver exited: {receiver_process.stderr.read().decode()}")
             if sender_process.poll() is not None:
                 pytest.fail(f"sender exited: {sender_process.stderr.read()}")
             ready, _, _ = select.select([receiver_process.stdout], [], [], 0.2)
             if ready:
-                line = receiver_process.stdout.readline()
-                output.append(line)
-                if "ID=0x100 DLC=8 DATA=00 01 02 03 04 05 06 07" in line:
+                output.extend(os.read(receiver_process.stdout.fileno(), 4096))
+                if b"coolant_temperature_c=85" in output:
                     break
         else:
             pytest.fail(f"no expected frame within 5 seconds; output: {output!r}")
@@ -74,6 +72,8 @@ def test_virtual_ecu_reaches_socketcan_receiver():
 
     assert re.search(
         r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z "
-        r"ID=0x100 DLC=8 DATA=00 01 02 03 04 05 06 07",
-        "".join(output),
+        r"ID=0x100 DLC=8 DATA=39 30 C4 09 7D 00 00 00\n"
+        r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z "
+        r"vehicle_speed_kph=123\.45 engine_rpm=2500 coolant_temperature_c=85",
+        output.decode(),
     ), f"receiver output: {output!r}"
