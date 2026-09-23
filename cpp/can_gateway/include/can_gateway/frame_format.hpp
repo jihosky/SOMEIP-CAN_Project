@@ -1,12 +1,11 @@
 #pragma once
 
-#include <chrono>
-#include <linux/can.h>
+#include "can_gateway/can_frame.hpp"
+
 #include <string>
 
 namespace can_gateway {
 
-std::string format_frame(const can_frame& frame,
-                         std::chrono::system_clock::time_point received_at);
+std::string format_frame(const CanFrame& frame);
 
 }  // namespace can_gateway

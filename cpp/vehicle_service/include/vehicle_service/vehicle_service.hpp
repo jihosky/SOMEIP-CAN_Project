@@ -3,6 +3,7 @@
 #include "vehicle_service/vehicle_data.hpp"
 
 #include <optional>
+#include <mutex>
 
 namespace vehicle_service {
 
@@ -15,6 +16,7 @@ public:
     std::optional<std::int16_t> getCoolantTemperature() const;
 
 private:
+    mutable std::mutex mutex_;
     std::optional<VehicleData> latest_;
 };
 

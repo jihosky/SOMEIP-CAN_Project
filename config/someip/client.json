@@ -1,0 +1,10 @@
+{
+  "unicast": "127.0.0.1",
+  "logging": {"level": "error", "console": "true", "dlt": "false"},
+  "applications": [
+    {"name": "vehicle-provider", "id": "0x6301"},
+    {"name": "vehicle-client", "id": "0x6302"}
+  ],
+  "routing": "vehicle-provider",
+  "service-discovery": {"enable": "false"}
+}

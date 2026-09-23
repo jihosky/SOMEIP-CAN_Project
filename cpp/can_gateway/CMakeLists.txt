@@ -24,12 +24,15 @@ configure_file(
 add_library(can_frame_format STATIC src/frame_format.cpp)
 target_include_directories(can_frame_format PUBLIC include)
 
+add_library(socketcan_receiver_core STATIC src/socketcan_receiver_core.cpp)
+target_include_directories(socketcan_receiver_core PUBLIC include)
+
 add_library(signal_decoder STATIC src/signal_decoder.cpp)
 target_include_directories(signal_decoder PUBLIC include ${PROJECT_BINARY_DIR}/generated)
 target_link_libraries(signal_decoder PUBLIC vehicle_service)
 
 add_executable(socketcan_receiver src/socketcan_receiver.cpp)
-target_link_libraries(socketcan_receiver PRIVATE can_frame_format signal_decoder vehicle_service)
+target_link_libraries(socketcan_receiver PRIVATE socketcan_receiver_core can_frame_format signal_decoder vehicle_service)
 
 if(BUILD_TESTING)
     add_executable(can_frame_format_test ../../tests/cpp/frame_format_test.cpp)

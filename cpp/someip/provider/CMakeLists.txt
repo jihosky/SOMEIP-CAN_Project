@@ -1,0 +1,6 @@
+add_library(vehicle_someip_provider STATIC src/vehicle_data_provider.cpp)
+target_include_directories(vehicle_someip_provider PUBLIC include)
+target_link_libraries(vehicle_someip_provider PUBLIC vehicle_service vehicle_someip_common vsomeip3)
+
+add_executable(vehicle_data_provider src/provider_main.cpp)
+target_link_libraries(vehicle_data_provider PRIVATE vehicle_someip_provider)

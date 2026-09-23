@@ -1,0 +1,3 @@
+add_executable(vehicle_gateway vehicle_gateway.cpp)
+target_link_libraries(vehicle_gateway PRIVATE socketcan_receiver_core signal_decoder
+    vehicle_service vehicle_someip_provider)

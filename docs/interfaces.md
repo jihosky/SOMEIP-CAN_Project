@@ -24,4 +24,18 @@ Both lines use the same receiver UTC timestamp, taken when the frame is processe
 
 `CanFrame` contains the ID, DLC, eight payload bytes, and receive timestamp without Linux types. `VehicleData` contains speed in km/h, RPM, coolant temperature in °C, and the same timestamp. `VehicleService` accepts decoded `VehicleData`, retains the latest sample, and exposes `getVehicleSpeed()`, `getEngineRpm()`, and `getCoolantTemperature()` as optional values. Before the first valid update, getters return no value. It does not expose raw frames.
 
-`0x100` and its payload are temporary demonstration values. Permanent signal definitions may later move to DBC files. SOME/IP and AI interfaces are not implemented in this milestone.
+`0x100` and its payload are temporary demonstration values. Permanent signal definitions may later move to DBC files. AI interfaces are not implemented in this milestone.
+
+## VehicleDataService SOME/IP methods
+
+Shared identifiers are defined in `cpp/someip/common/include/vehicle_someip/identifiers.hpp`. The service ID is `0x6301`, instance ID is `0x0001`, and the method IDs are listed below. Requests have an empty payload. Successful responses contain exactly the specified bytes in **big-endian (network) order**; these bytes are independent of the little-endian CAN layout.
+
+| Method | ID | Response payload |
+| --- | --- | --- |
+| GetVehicleSpeed | `0x0001` | 4-byte unsigned integer, speed × 100 km/h |
+| GetEngineRpm | `0x0002` | 2-byte unsigned integer, rpm |
+| GetCoolantTemperature | `0x0003` | 2-byte signed two's-complement integer, °C |
+
+For the local demo values (123.45 km/h, 2500 rpm, 85 °C), the payloads are `00 00 30 39`, `09 C4`, and `00 55`. When the service has no sample, the provider returns SOME/IP `E_NOT_READY` with no value payload. The client rejects incorrect payload lengths and reports unavailable service or response timeouts. Method responses do not include a timestamp yet.
+
+In the integrated gateway, the first valid decoded CAN frame supplies the latest `VehicleData`; no initial sample is seeded. Requests arriving before that frame receive `E_NOT_READY`. Subsequent requests read the latest sample through `VehicleService`. The SOME/IP payload contract is unchanged from Milestone 2A.
