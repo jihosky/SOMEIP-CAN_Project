@@ -19,8 +19,10 @@ namespace {
 
 class VehicleDataClient {
 public:
-    explicit VehicleDataClient(std::chrono::milliseconds timeout)
-        : timeout_(timeout), application_(vsomeip::runtime::get()->create_application("vehicle-client")) {}
+    VehicleDataClient(std::chrono::milliseconds timeout, bool subscribe,
+                      std::size_t event_count)
+        : timeout_(timeout), subscribe_(subscribe), event_count_(event_count),
+          application_(vsomeip::runtime::get()->create_application("vehicle-client")) {}
 
     int run() {
         if (!application_ || !application_->init()) {
@@ -28,9 +30,16 @@ public:
             return 1;
         }
         application_->register_state_handler([this](vsomeip::state_type_e state) {
-            if (state == vsomeip::state_type_e::ST_REGISTERED) {
-                application_->request_service(vehicle_someip::service_id,
-                                              vehicle_someip::instance_id);
+            if (state != vsomeip::state_type_e::ST_REGISTERED) return;
+            application_->request_service(vehicle_someip::service_id,
+                                          vehicle_someip::instance_id);
+            if (subscribe_) {
+                application_->request_event(
+                    vehicle_someip::service_id, vehicle_someip::instance_id,
+                    vehicle_someip::vehicle_data_event_id,
+                    {vehicle_someip::vehicle_data_eventgroup_id},
+                    vsomeip::event_type_e::ET_EVENT,
+                    vsomeip::reliability_type_e::RT_RELIABLE);
             }
         });
         application_->register_availability_handler(
@@ -38,19 +47,30 @@ public:
             [this](vsomeip::service_t, vsomeip::instance_t, bool available) {
                 on_availability(available);
             });
-        for (const auto method : methods_) {
+        if (subscribe_) {
             application_->register_message_handler(
-                vehicle_someip::service_id, vehicle_someip::instance_id, method,
-                [this](const std::shared_ptr<vsomeip::message>& response) {
-                    on_response(response);
+                vehicle_someip::service_id, vehicle_someip::instance_id,
+                vehicle_someip::vehicle_data_event_id,
+                [this](const std::shared_ptr<vsomeip::message>& message) {
+                    on_event(message);
                 });
+        } else {
+            for (const auto method : methods_) {
+                application_->register_message_handler(
+                    vehicle_someip::service_id, vehicle_someip::instance_id, method,
+                    [this](const std::shared_ptr<vsomeip::message>& response) {
+                        on_response(response);
+                    });
+            }
         }
 
         std::thread deadline([this] {
             std::unique_lock<std::mutex> lock(mutex_);
             if (!condition_.wait_for(lock, timeout_, [this] { return completed_; })) {
-                error_ = available_ ? "Timed out waiting for SOME/IP responses"
-                                    : "VehicleDataService unavailable before timeout";
+                error_ = available_ ? (subscribe_
+                    ? "Timed out waiting for VehicleData events"
+                    : "Timed out waiting for SOME/IP responses")
+                    : "VehicleDataService unavailable before timeout";
             }
             lock.unlock();
             application_->stop();
@@ -77,12 +97,45 @@ private:
             if (!available || requested_) return;
             requested_ = true;
         }
+        if (subscribe_) {
+            application_->subscribe(
+                vehicle_someip::service_id, vehicle_someip::instance_id,
+                vehicle_someip::vehicle_data_eventgroup_id, vsomeip::DEFAULT_MAJOR,
+                vehicle_someip::vehicle_data_event_id);
+            std::cout << "Subscribed to VehicleData events" << std::endl;
+            return;
+        }
         for (const auto method : methods_) {
             auto request = vsomeip::runtime::get()->create_request();
             request->set_service(vehicle_someip::service_id);
             request->set_instance(vehicle_someip::instance_id);
             request->set_method(method);
             application_->send(request);
+        }
+    }
+
+    void on_event(const std::shared_ptr<vsomeip::message>& message) {
+        const auto payload = message->get_payload();
+        const auto data = payload
+            ? vehicle_someip::decode_vehicle_data(payload->get_data(),
+                                                  payload->get_length())
+            : std::nullopt;
+        std::lock_guard<std::mutex> lock(mutex_);
+        if (completed_) return;
+        if (!data) {
+            error_ = "Malformed VehicleData event payload";
+            completed_ = true;
+            condition_.notify_all();
+            return;
+        }
+        std::cout << "VehicleData event: speed=" << std::fixed
+                  << std::setprecision(2) << data->vehicle_speed_kph
+                  << " km/h rpm=" << data->engine_rpm
+                  << " coolant=" << data->coolant_temperature_c << " C"
+                  << std::endl;
+        if (++events_received_ >= event_count_) {
+            completed_ = true;
+            condition_.notify_all();
         }
     }
 
@@ -101,20 +154,17 @@ private:
                 std::ostringstream stream;
                 switch (response->get_method()) {
                 case vehicle_someip::get_vehicle_speed_id:
-                    if (const auto value = vehicle_someip::decode_speed(data, length)) {
+                    if (const auto value = vehicle_someip::decode_speed(data, length))
                         stream << "Vehicle speed: " << std::fixed << std::setprecision(2)
                                << *value << " km/h";
-                    }
                     break;
                 case vehicle_someip::get_engine_rpm_id:
-                    if (const auto value = vehicle_someip::decode_rpm(data, length)) {
+                    if (const auto value = vehicle_someip::decode_rpm(data, length))
                         stream << "Engine RPM: " << *value << " rpm";
-                    }
                     break;
                 case vehicle_someip::get_coolant_temperature_id:
-                    if (const auto value = vehicle_someip::decode_temperature(data, length)) {
+                    if (const auto value = vehicle_someip::decode_temperature(data, length))
                         stream << "Coolant temperature: " << *value << " C";
-                    }
                     break;
                 }
                 line = stream.str().empty() ? "Malformed SOME/IP payload" : stream.str();
@@ -127,9 +177,9 @@ private:
             if (response->get_method() == methods_[index] && !received_[index]) {
                 received_[index] = true;
                 std::cout << line << std::endl;
-                if (line.find("Malformed") == 0 || line.find("unavailable") != std::string::npos) {
+                if (line.find("Malformed") == 0 ||
+                    line.find("unavailable") != std::string::npos)
                     error_ = line;
-                }
                 break;
             }
         }
@@ -140,6 +190,8 @@ private:
     }
 
     const std::chrono::milliseconds timeout_;
+    const bool subscribe_;
+    const std::size_t event_count_;
     std::shared_ptr<vsomeip::application> application_;
     std::mutex mutex_;
     std::condition_variable condition_;
@@ -147,6 +199,7 @@ private:
         vehicle_someip::get_vehicle_speed_id, vehicle_someip::get_engine_rpm_id,
         vehicle_someip::get_coolant_temperature_id};
     std::array<bool, 3> received_{};
+    std::size_t events_received_ = 0;
     bool available_ = false;
     bool requested_ = false;
     bool completed_ = false;
@@ -157,21 +210,28 @@ private:
 
 int main(int argc, char* argv[]) {
     int timeout_seconds = 5;
-    if (argc == 3 && std::string(argv[1]) == "--timeout") {
+    std::size_t event_count = 0;
+    for (int index = 1; index < argc; ++index) {
+        const std::string argument = argv[index];
         try {
-            timeout_seconds = std::stoi(argv[2]);
+            if (argument == "--timeout" && index + 1 < argc) {
+                timeout_seconds = std::stoi(argv[++index]);
+            } else if (argument == "--subscribe" && index + 1 < argc) {
+                event_count = static_cast<std::size_t>(std::stoul(argv[++index]));
+            } else {
+                throw std::invalid_argument("argument");
+            }
         } catch (...) {
-            std::cerr << "Invalid timeout\n";
+            std::cerr << "Usage: " << argv[0]
+                      << " [--timeout SECONDS] [--subscribe EVENT_COUNT]\n";
             return 2;
         }
-        if (timeout_seconds <= 0 || timeout_seconds > 300) {
-            std::cerr << "Timeout must be between 1 and 300 seconds\n";
-            return 2;
-        }
-    } else if (argc != 1) {
-        std::cerr << "Usage: " << argv[0] << " [--timeout SECONDS]\n";
+    }
+    if (timeout_seconds <= 0 || timeout_seconds > 300 || event_count > 10000) {
+        std::cerr << "Timeout must be 1-300 seconds and event count 1-10000\n";
         return 2;
     }
-    VehicleDataClient client{std::chrono::seconds(timeout_seconds)};
+    VehicleDataClient client{std::chrono::seconds(timeout_seconds),
+                             event_count != 0, event_count};
     return client.run();
 }

@@ -59,6 +59,7 @@ int main(int argc, char* argv[]) {
         const bool okay = receiver.run([&](const can_gateway::CanFrame& frame) {
             if (const auto data = decoder.decode(frame)) {
                 service.update(*data);
+                provider.publish(*data);
                 std::cout << vehicle_service::format_vehicle_data(*data) << std::endl;
             }
         }, receive_error);

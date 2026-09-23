@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "python"))
 
 from virtual_ecu.__main__ import (
     COOLANT_TEMPERATURE_C,
+    ACCELERATION_SAMPLES,
     DEFINITION,
     ENGINE_RPM,
     VEHICLE_SPEED_KPH,
@@ -22,3 +23,12 @@ def test_milestone_frame_is_standard_and_deterministic():
     assert VEHICLE_SPEED_KPH == 123.45
     assert ENGINE_RPM == 2500
     assert COOLANT_TEMPERATURE_C == 85
+
+
+def test_acceleration_payload_sequence_is_deterministic():
+    payloads = [make_message(sample).data for sample in ACCELERATION_SAMPLES]
+    assert payloads == [
+        bytes.fromhex("D0 07 B0 04 6E 00 00 00"),
+        bytes.fromhex("A0 0F 08 07 6F 00 00 00"),
+        bytes.fromhex("70 17 60 09 70 00 00 00"),
+    ]

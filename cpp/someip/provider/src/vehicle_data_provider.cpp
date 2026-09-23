@@ -3,6 +3,8 @@
 #include "vehicle_someip/identifiers.hpp"
 #include "vehicle_someip/payload_codec.hpp"
 
+#include <chrono>
+#include <set>
 #include <vector>
 
 namespace vehicle_someip {
@@ -24,6 +26,11 @@ bool VehicleDataProvider::init() {
     }
     application_->register_state_handler([this](vsomeip::state_type_e state) {
         if (state == vsomeip::state_type_e::ST_REGISTERED) {
+            application_->offer_event(
+                service_id, instance_id, vehicle_data_event_id,
+                {vehicle_data_eventgroup_id}, vsomeip::event_type_e::ET_EVENT,
+                std::chrono::milliseconds::zero(), false, true, nullptr,
+                vsomeip::reliability_type_e::RT_RELIABLE);
             application_->offer_service(service_id, instance_id);
         }
     });
@@ -31,6 +38,12 @@ bool VehicleDataProvider::init() {
 }
 
 void VehicleDataProvider::start() { application_->start(); }
+
+void VehicleDataProvider::publish(const vehicle_service::VehicleData& data) {
+    const auto bytes = encode_vehicle_data(data);
+    application_->notify(service_id, instance_id, vehicle_data_event_id,
+                         vsomeip::runtime::get()->create_payload(bytes), true);
+}
 
 void VehicleDataProvider::on_request(const std::shared_ptr<vsomeip::message>& request) {
     auto response = vsomeip::runtime::get()->create_response(request);

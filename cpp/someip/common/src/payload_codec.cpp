@@ -47,4 +47,24 @@ std::optional<std::int16_t> decode_temperature(const std::uint8_t* data,
     return static_cast<std::int16_t>(signed_value);
 }
 
+std::vector<std::uint8_t> encode_vehicle_data(
+    const vehicle_service::VehicleData& data) {
+    auto bytes = encode_speed(data.vehicle_speed_kph);
+    const auto rpm = encode_rpm(data.engine_rpm);
+    const auto temperature = encode_temperature(data.coolant_temperature_c);
+    bytes.insert(bytes.end(), rpm.begin(), rpm.end());
+    bytes.insert(bytes.end(), temperature.begin(), temperature.end());
+    return bytes;
+}
+
+std::optional<vehicle_service::VehicleData> decode_vehicle_data(
+    const std::uint8_t* data, std::size_t length) {
+    if (data == nullptr || length != 8) return std::nullopt;
+    const auto speed = decode_speed(data, 4);
+    const auto rpm = decode_rpm(data + 4, 2);
+    const auto temperature = decode_temperature(data + 6, 2);
+    if (!speed || !rpm || !temperature) return std::nullopt;
+    return vehicle_service::VehicleData{*speed, *rpm, *temperature, {}};
+}
+
 }  // namespace vehicle_someip

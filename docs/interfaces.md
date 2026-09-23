@@ -39,3 +39,18 @@ Shared identifiers are defined in `cpp/someip/common/include/vehicle_someip/iden
 For the local demo values (123.45 km/h, 2500 rpm, 85 °C), the payloads are `00 00 30 39`, `09 C4`, and `00 55`. When the service has no sample, the provider returns SOME/IP `E_NOT_READY` with no value payload. The client rejects incorrect payload lengths and reports unavailable service or response timeouts. Method responses do not include a timestamp yet.
 
 In the integrated gateway, the first valid decoded CAN frame supplies the latest `VehicleData`; no initial sample is seeded. Requests arriving before that frame receive `E_NOT_READY`. Subsequent requests read the latest sample through `VehicleService`. The SOME/IP payload contract is unchanged from Milestone 2A.
+
+
+## VehicleData event
+
+The `VehicleData` event ID is `0x8001`; its event group ID is `0x0001`. Both identifiers are defined with the method identifiers in `cpp/someip/common/include/vehicle_someip/identifiers.hpp`. The client requests the event and subscribes to its event group after vSomeIP Service Discovery reports the service available.
+
+The event payload is eight bytes in **big-endian (network) order**:
+
+| Bytes | Value | Encoding |
+| --- | --- | --- |
+| 0–3 | Vehicle speed | Unsigned 32-bit, speed × 100 km/h |
+| 4–5 | Engine RPM | Unsigned 16-bit rpm |
+| 6–7 | Coolant temperature | Signed 16-bit two's-complement °C |
+
+This payload contains vehicle-domain values and has no CAN identifier, DLC, reserved CAN bytes, or CAN byte order. Every successfully decoded `VehicleData` sample triggers one event notification. The method payloads and identifiers remain unchanged.

@@ -99,3 +99,32 @@ Run the live end-to-end test explicitly:
 ```sh
 python3 -m pytest tests/integration/test_live_gateway.py -m integration
 ```
+
+
+## Run dynamic VehicleData events
+
+Start the integrated gateway:
+
+~~~sh
+VSOMEIP_CONFIGURATION="$PWD/config/someip/provider.json" ./build/cpp/apps/vehicle_gateway --interface vcan0
+~~~
+
+Start a client that subscribes and exits after three events:
+
+~~~sh
+VSOMEIP_CONFIGURATION="$PWD/config/someip/client.json" ./build/cpp/someip/client/vehicle_data_client --timeout 10 --subscribe 3
+~~~
+
+After the client prints its subscription message, start the deterministic acceleration scenario:
+
+~~~sh
+PYTHONPATH=python python3 -m virtual_ecu --interface vcan0 --interval 0.5 --scenario acceleration
+~~~
+
+The expected repeating samples are `(20.00 km/h, 1200 rpm, 70 °C)`, `(40.00 km/h, 1800 rpm, 71 °C)`, and `(60.00 km/h, 2400 rpm, 72 °C)`. Use `--scenario steady` or omit the option to preserve the fixed Milestone 2B sample. Method mode remains the client default when `--subscribe` is omitted.
+
+The provider and client configurations enable vSomeIP Service Discovery over multicast `224.244.224.245:30490`. The provider remains the local routing manager. Run the event integration test with:
+
+~~~sh
+python3 -m pytest tests/integration/test_someip_events.py -m integration
+~~~

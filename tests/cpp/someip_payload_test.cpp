@@ -40,5 +40,19 @@ int main() {
         std::cerr << "Boundary value mismatch\n";
         return 1;
     }
+    const vehicle_service::VehicleData sample{123.45, 2500, 85, {}};
+    const std::vector<std::uint8_t> vehicle{
+        0x00, 0x00, 0x30, 0x39, 0x09, 0xC4, 0x00, 0x55};
+    if (encode_vehicle_data(sample) != vehicle) {
+        std::cerr << "Incorrect VehicleData event encoding\n";
+        return 1;
+    }
+    const auto decoded = decode_vehicle_data(vehicle.data(), vehicle.size());
+    if (!decoded || decoded->vehicle_speed_kph != 123.45 ||
+        decoded->engine_rpm != 2500 || decoded->coolant_temperature_c != 85 ||
+        decode_vehicle_data(vehicle.data(), 7)) {
+        std::cerr << "Incorrect VehicleData event decoding\n";
+        return 1;
+    }
     return 0;
 }

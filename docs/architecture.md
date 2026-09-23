@@ -48,6 +48,19 @@ Python virtual ECU → vcan0 → SocketCanReceiver → SignalDecoder
 
 The CAN receive loop runs in a worker thread. vSomeIP's blocking `start()` runs on the main thread and invokes provider callbacks on its own runtime threads. `VehicleService` protects its latest-data snapshot with one mutex; updates and getters copy under that lock. A small control thread watches for SIGINT, SIGTERM, or CAN-loop failure, then stops the receiver and vSomeIP. The CAN socket has a 200 ms receive timeout so the worker can exit promptly; both threads are joined before process exit. No inter-process data transport is used inside the gateway.
 
+
+## Milestone 2C: dynamic events
+
+~~~text
+deterministic ECU scenario → CAN sample → VehicleService update
+                                      ├→ method responses
+                                      └→ VehicleData event → subscribed client
+~~~
+
+The virtual ECU supports `steady` and `acceleration` scenarios. Acceleration repeats three deterministic samples. Each decoded CAN sample is written to `VehicleService` and passed to `VehicleDataProvider::publish`. The provider encodes the domain values and calls vSomeIP `notify` once for that sample. There is no polling or event timer.
+
+The provider offers event `0x8001` in event group `0x0001`. The client requests the service and event, waits for Service Discovery availability, and then subscribes to the group. Method request/response remains available through the same service. SocketCAN has no vSomeIP dependency, the provider has no CAN dependency, and `VehicleService` remains the synchronized vehicle-domain boundary.
+
 ## Boundaries for later milestones
 
 The CAN gateway owns raw frames and decoding. The `vehicle_service` layer owns stable vehicle concepts and is the boundary presented to SOME/IP services. The SOME/IP provider and client handle transport, while the AI agent will consume only a high-level vehicle API. Raw CAN frames and SOME/IP messages will not enter the AI layer. See [ADR 0002](decisions/0002-layer-boundaries.md) and [ADR 0003](decisions/0003-use-vsomeip.md).

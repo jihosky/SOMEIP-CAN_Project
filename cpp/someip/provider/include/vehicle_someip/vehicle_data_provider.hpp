@@ -13,6 +13,7 @@ public:
                         const vehicle_service::VehicleService& service);
     bool init();
     void start();
+    void publish(const vehicle_service::VehicleData& data);
 
 private:
     void on_request(const std::shared_ptr<vsomeip::message>& request);
