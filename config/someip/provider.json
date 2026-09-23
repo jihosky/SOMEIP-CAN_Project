@@ -9,7 +9,7 @@
     {
       "service": "0x6301",
       "instance": "0x0001",
-      "reliable": "30540",
+      "reliable": {"port": "30540", "enable-magic-cookies": "false"},
       "events": [
         {"event": "0x8001", "is_field": "false", "is_reliable": "true"}
       ],

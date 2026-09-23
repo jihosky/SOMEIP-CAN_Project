@@ -47,6 +47,8 @@ def process_exists(pid):
 def test_argument_and_missing_binary_errors():
     cases = [
         ([str(SERVER), "--scenario", "wrong"], {}, 2, "Scenario must be"),
+        ([str(SERVER), "--someip-profile", "wrong"], {}, 2, "SOME/IP profile must be"),
+        ([str(CLIENT), "--someip-profile", "wrong", "method"], {}, 2, "SOME/IP profile must be"),
         ([str(SERVER), "--interval", "0"], {}, 2, "--interval must be"),
         ([str(SERVER), "--interface", "vcan999"], {}, 1, "is missing"),
         ([str(SERVER)], {"VEHICLE_GATEWAY_BIN": "/tmp/missing-vehicle-gateway"}, 1, "Gateway executable missing"),
@@ -75,12 +77,14 @@ def test_two_terminal_event_flow_and_shutdown():
     child_pids = []
     try:
         prefix = wait_for_text(server, b"Server running")
+        assert b"config/someip/provider.json; application: vehicle-provider" in prefix
         child_pids = [int(value) for value in re.findall(rb"(?:Gateway|ECU) PID: (\d+)", prefix)]
         assert len(child_pids) == 2, prefix.decode()
         result = subprocess.run(
             [str(CLIENT), "subscribe", "3"], capture_output=True, text=True, timeout=20
         )
         assert result.returncode == 0, result.stdout + result.stderr
+        assert "config/someip/client.json; application: vehicle-client" in result.stdout
         for value in ("speed=20.00", "speed=40.00", "speed=60.00"):
             assert value in result.stdout, result.stdout
     finally:

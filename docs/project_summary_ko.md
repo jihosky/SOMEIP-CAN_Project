@@ -6,7 +6,7 @@
 
 **목표:** 가상 차량 데이터를 Linux CAN 인터페이스로 보내고 C++ 게이트웨이에서 해석한 뒤 SOME/IP 서비스로 제공하는 차량 소프트웨어 플랫폼을 단계적으로 구축한다. 현재 구현 범위는 가상 ECU부터 SOME/IP 클라이언트까지다.
 
-프로젝트를 시작할 때 Raspberry Pi 5와 이중 채널 CAN HAT은 있었지만, 신뢰성 있게 물리 CAN 버스를 시험할 독립 ECU 또는 CAN 노드가 없었다. 그래서 Windows + WSL2에서 vCAN 기반의 재현 가능한 통신 경로를 먼저 만들었다. 최종 방향은 고수준 차량 API, PC 측 AI 진단 에이전트, 진단 화면과 보고서, 물리 CAN 및 Raspberry Pi 검증이다. 이 확장 항목은 아직 구현되지 않았다.
+프로젝트를 시작할 때 Raspberry Pi 5와 이중 채널 CAN HAT은 있었지만, 신뢰성 있게 물리 CAN 버스를 시험할 독립 ECU 또는 CAN 노드가 없었다. 그래서 Windows + WSL2에서 vCAN 기반의 재현 가능한 통신 경로를 먼저 만들었다. 최종 방향은 고수준 차량 API, PC 측 AI 진단 에이전트, 진단 화면과 보고서, 물리 CAN 및 Raspberry Pi 검증이다. Pi의 CAN 수신·디코딩과 SOME/IP 송신에 이어 PC/WSL의 서비스 발견, 원격 메서드 응답 및 이벤트 3개 수신까지 직접 연결에서 검증했다.
 
 ## 2. 전체 아키텍처
 
@@ -100,12 +100,12 @@ SocketCAN은 Linux 소켓과 프레임 수신을 담당하고 디코더는 CAN �
 
 ## 9. 테스트 및 검증 현황
 
-현재 저장소에서 수집되는 테스트는 **CTest 4개, Python 단위 2개, `integration` 표시 통합 7개**다. 통합 7개에는 런처 관련 3개가 포함된다. 이전 런처 작업에서 CMake 구성·빌드, CTest 4개, Python 단위 2개, 통합 7개, `run_demo.sh`, `git diff --check`가 통과했다. 아래 범위는 실제 테스트 파일과 수집 결과를 기준으로 한다.
+현재 저장소에서 수집되는 테스트는 **CTest 4개, Python 단위 4개, `integration` 표시 통합 7개**다. 통합 7개에는 런처 관련 3개가 포함된다. 이전 런처 작업에서 CMake 구성·빌드, CTest 4개, 당시 Python 단위 2개, 통합 7개, `run_demo.sh`, `git diff --check`가 통과했다. 아래 범위는 실제 테스트 파일과 수집 결과를 기준으로 한다.
 
 | 구분 | 검증 내용 |
 | --- | --- |
 | C++ 단위 | 프레임 출력, 디코딩 경계 값, 서비스 최신 값·동시 접근, SOME/IP 메서드·이벤트 코덱 |
-| Python 단위 | 고정 CAN 프레임과 가속 시나리오의 세 페이로드 |
+| Python 단위 | 고정 CAN 프레임과 가속 시나리오의 세 페이로드, 로컬/멀티 호스트 SOME/IP 설정 계약 |
 | vCAN 통합 | 가상 ECU → C++ 수신기 → 원시·디코딩 출력 |
 | SOME/IP 메서드 통합 | 고정 서비스 값 → 제공자 → 클라이언트 및 실시간 ECU → 게이트웨이 → 클라이언트 |
 | SOME/IP 이벤트 통합 | 가속 시나리오의 세 샘플 순서와 값 |
@@ -139,9 +139,18 @@ SocketCAN은 Linux 소켓과 프레임 수신을 담당하고 디코더는 CAN �
 | [ADR 0002: 계층 경계](decisions/0002-layer-boundaries.md) | CAN 디코딩, 차량 서비스, SOME/IP, 향후 AI API의 책임을 분리한다. |
 | [ADR 0003: vSomeIP](decisions/0003-use-vsomeip.md) | 설치된 vSomeIP를 로컬 서비스 메서드에 사용하고 식별자·코덱·제공자·클라이언트를 분리한다. 이후 단계에서 이벤트와 Service Discovery가 추가되었다. |
 
+## 멀티 호스트 SOME/IP 조사 상태
+
+- **구현:** Pi용 `config/someip/provider_pi.json`과 PC/WSL용 `client_pc.json`을 로컬 루프백 설정과 분리했다. 런처의 `--someip-profile pi|pc`는 설정 경로와 애플리케이션 이름을 출력하고 주소·SD 멀티캐스트 경로를 검사한다. 제공자는 등록과 `offer_service()` 호출 시점을 기록한다.
+- **로컬 검증:** 기존 vCAN → 게이트웨이 → SOME/IP 메서드·이벤트 테스트는 한 호스트에서 수행한다. 로컬 성공은 Ethernet 전달의 증거가 아니다. 현재 작업 환경에는 `vcan0`가 없어 이번 조사에서 vCAN 의존 통합 테스트는 건너뛰었다.
+- **Pi 측 현장 확인:** 소유자가 CAN 수신·디코딩, `192.168.50.2:30540` LISTEN 및 `eth0`의 UDP 30490 SD 송신을 확인했다. Pi의 원시 캡처는 이 작업 환경에서 직접 수행하지 않았다.
+- **멀티 호스트 실측 완료:** mirrored WSL의 `eth0`와 Windows Ethernet은 `192.168.50.1/24`였다. Windows에서 Pi `192.168.50.2:30490`의 SD UDP 패킷 56바이트를 수신했다. WSL `vehicle-client`는 `client_pc.json`을 읽고 `0x6301/0x0001` 서비스를 발견했다. `192.168.50.1:<임시 포트> → 192.168.50.2:30540` TCP 연결이 `ESTAB`였으며, 세 메서드(60.00 km/h, 2400 rpm, 72 C)와 가속 이벤트 세 개(60/2400/72 → 20/1200/70 → 40/1800/71)를 수신했다.
+- **원인 및 제한:** Windows Public과 WSL Hyper-V의 인바운드 기본 정책은 `Block`이었다. Pi 주소·UDP 30490에 한정한 허용 규칙 적용 전에는 SD 수신과 메서드가 실패했고, 적용 후 성공했다. WSL의 멀티캐스트 경로가 재설정 과정에서 `eth0`에서 `eth1`로 바뀐 적도 있다. WSL `tcpdump`는 권한 부족으로 실행하지 못했다.
+- **아직 미검증:** 장시간 연결 안정성, 링크 재연결 뒤 복구, 패킷 손실, 다른 주소·네트워크·호스트에서의 서비스 발견은 [실행 지침](runbook.md)에 따라 추가 검증이 필요하다.
+
 ## 12. 현재까지 확인된 한계
 
-- **미검증:** 물리 CAN 버스·배선·종단·CAN HAT과 `can0`/`can1` 경로, Raspberry Pi 배포, 다중 호스트 SOME/IP Service Discovery, 패킷 손실과 복구 동작.
+- **미검증:** 물리 CAN 버스·배선·종단·CAN HAT과 `can0`/`can1` 경로, Raspberry Pi의 지속적 배포·재시작 운영, 다른 네트워크의 SOME/IP Service Discovery, 패킷 손실과 복구 동작.
 - **미구현:** AI Agent, 고수준 Python Vehicle API, UDS 진단, 대시보드, 진단 보고서.
 - **현재 범위:** `0x100` 신호 정의와 이진 서비스 페이로드는 시연용 계약이다. 외부 클라이언트에 공개하기 전 DBC 기반 정의와 버전 관리가 필요하다.
 

@@ -7,6 +7,7 @@
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -43,6 +44,10 @@ int main(int argc, char* argv[]) {
     const can_gateway::SignalDecoder decoder;
     auto application = vsomeip::runtime::get()->create_application("vehicle-provider");
     vehicle_someip::VehicleDataProvider provider(application, service);
+    const char* configuration = std::getenv("VSOMEIP_CONFIGURATION");
+    std::cerr << "[SOMEIP] application=" << application->get_name()
+              << " VSOMEIP_CONFIGURATION="
+              << (configuration ? configuration : "(unset)") << std::endl;
     if (!provider.init()) {
         std::cerr << "Could not initialize vSomeIP provider; check VSOMEIP_CONFIGURATION\n";
         return 1;
@@ -77,7 +82,8 @@ int main(int argc, char* argv[]) {
         application->stop();
     });
 
-    std::cout << "Integrated vehicle gateway ready on " << interface_name << std::endl;
+    std::cout << "Integrated vehicle gateway ready on " << interface_name
+              << " (vSomeIP registration pending)" << std::endl;
     provider.start();
     app_done.store(true);
     receiver.stop();

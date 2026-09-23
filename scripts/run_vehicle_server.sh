@@ -6,10 +6,11 @@ repo_root="$(cd -- "$script_dir/.." && pwd)"
 scenario=steady
 interval=1.0
 interface=vcan0
+someip_profile=local
 gateway_pid=""
 ecu_pid=""
 
-usage() { printf 'Usage: %s [--scenario steady|acceleration] [--interval SECONDS] [--interface NAME]\n' "$0"; }
+usage() { printf 'Usage: %s [--scenario steady|acceleration] [--interval SECONDS] [--interface NAME] [--someip-profile local|pi]\n' "$0"; }
 log() { printf '[SETUP] %s\n' "$*"; }
 prefix_lines() {
     local component="$1" line
@@ -45,12 +46,13 @@ trap 'exit 143' TERM
 
 while (($#)); do
     case "$1" in
-        --scenario|--interval|--interface)
+        --scenario|--interval|--interface|--someip-profile)
             if (($# < 2)); then usage >&2; exit 2; fi
             case "$1" in
                 --scenario) scenario="$2" ;;
                 --interval) interval="$2" ;;
                 --interface) interface="$2" ;;
+                --someip-profile) someip_profile="$2" ;;
             esac
             shift 2 ;;
         --help|-h) usage; exit 0 ;;
@@ -59,6 +61,9 @@ while (($#)); do
 done
 if [[ "$scenario" != steady && "$scenario" != acceleration ]]; then
     printf '[SETUP] Scenario must be steady or acceleration\n' >&2; exit 2
+fi
+if [[ "$someip_profile" != local && "$someip_profile" != pi ]]; then
+    printf '[SETUP] SOME/IP profile must be local or pi\n' >&2; exit 2
 fi
 if [[ ! "$interface" =~ ^[A-Za-z0-9_.-]{1,15}$ ]]; then
     printf '[SETUP] Invalid CAN interface name: %s\n' "$interface" >&2; exit 2
@@ -84,7 +89,9 @@ if [[ ! -x "$gateway_bin" ]]; then
     printf '[SETUP] Build it with: cmake -S . -B build -G Ninja && cmake --build build\n' >&2
     exit 1
 fi
-if [[ ! -f "$repo_root/config/someip/provider.json" ]]; then
+someip_config="$repo_root/config/someip/provider.json"
+if [[ "$someip_profile" == pi ]]; then someip_config="$repo_root/config/someip/provider_pi.json"; fi
+if [[ ! -f "$someip_config" ]]; then
     printf '[SETUP] vSomeIP provider config missing\n' >&2; exit 1
 fi
 if ! PYTHONPATH="$repo_root/python" "$python_bin" -c 'import can, virtual_ecu.__main__' >/dev/null 2>&1; then
@@ -105,10 +112,24 @@ if ! ip -o link show dev "$interface" | grep -Eq '<[^>]*UP'; then
     printf '[SETUP] %s exists but is down. Bring it up explicitly: sudo ip link set dev %s up\n' "$interface" "$interface" >&2
     exit 1
 fi
+if [[ "$someip_profile" == pi ]]; then
+    if ! ip -o -4 addr show dev eth0 | grep -q 'inet 192[.]168[.]50[.]2/24'; then
+        printf '[SETUP] Pi profile requires 192.168.50.2/24 on eth0; inspect ip addr show dev eth0\n' >&2
+        exit 1
+    fi
+    if ! ip route get 224.244.224.245 | grep -Eq 'dev eth0( |$)'; then
+        printf '[SETUP] SD multicast route is not eth0; inspect ip route get 224.244.224.245\n' >&2
+        printf '[SETUP] Add it explicitly if appropriate: sudo ip route replace 224.244.224.245/32 dev eth0\n' >&2
+        exit 1
+    fi
+fi
 log "$interface available"
 log "Using Python: $python_bin"
 
-export VSOMEIP_CONFIGURATION="$repo_root/config/someip/provider.json"
+export VSOMEIP_CONFIGURATION="$someip_config"
+export VSOMEIP_APPLICATION_NAME=vehicle-provider
+log "SOME/IP profile: $someip_profile; config: $VSOMEIP_CONFIGURATION; application: $VSOMEIP_APPLICATION_NAME"
+if [[ "$someip_profile" == pi ]]; then log "Ethernet: 192.168.50.2/24 on eth0; SD multicast route via eth0"; fi
 log "Starting vehicle gateway..."
 "$gateway_bin" --interface "$interface" > >(prefix_lines GATEWAY) 2>&1 &
 gateway_pid=$!

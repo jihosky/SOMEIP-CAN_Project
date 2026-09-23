@@ -4,6 +4,7 @@
 #include "vehicle_service/vehicle_service.hpp"
 
 #include <chrono>
+#include <cstdlib>
 #include <iostream>
 #include <string>
 
@@ -19,12 +20,17 @@ int main(int argc, char* argv[]) {
     }
     auto application = vsomeip::runtime::get()->create_application("vehicle-provider");
     vehicle_someip::VehicleDataProvider provider(application, service);
+    const char* configuration = std::getenv("VSOMEIP_CONFIGURATION");
+    std::cerr << "[SOMEIP] application=" << application->get_name()
+              << " VSOMEIP_CONFIGURATION="
+              << (configuration ? configuration : "(unset)") << std::endl;
     if (!provider.init()) {
         std::cerr << "Could not initialize vSomeIP provider; check VSOMEIP_CONFIGURATION\n";
         return 1;
     }
     std::cout << "VehicleDataService provider ready"
-              << (argc == 2 ? " (demo values)" : " (no data)") << std::endl;
+              << (argc == 2 ? " (demo values)" : " (no data)")
+              << "; vSomeIP registration pending" << std::endl;
     provider.start();
     return 0;
 }

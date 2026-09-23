@@ -4,6 +4,7 @@
 #include "vehicle_someip/payload_codec.hpp"
 
 #include <chrono>
+#include <iostream>
 #include <set>
 #include <vector>
 
@@ -26,12 +27,18 @@ bool VehicleDataProvider::init() {
     }
     application_->register_state_handler([this](vsomeip::state_type_e state) {
         if (state == vsomeip::state_type_e::ST_REGISTERED) {
+            std::cerr << "[SOMEIP] vehicle-provider registered; offering VehicleData event"
+                         " 0x8001/group 0x0001 and service 0x6301/0x0001" << std::endl;
             application_->offer_event(
                 service_id, instance_id, vehicle_data_event_id,
                 {vehicle_data_eventgroup_id}, vsomeip::event_type_e::ET_EVENT,
                 std::chrono::milliseconds::zero(), false, true, nullptr,
                 vsomeip::reliability_type_e::RT_RELIABLE);
             application_->offer_service(service_id, instance_id);
+            std::cerr << "[SOMEIP] offer_service requested; confirm SD OfferService"
+                         " on UDP 30490 and TCP 30540 listener" << std::endl;
+        } else {
+            std::cerr << "[SOMEIP] vehicle-provider deregistered" << std::endl;
         }
     });
     return true;
