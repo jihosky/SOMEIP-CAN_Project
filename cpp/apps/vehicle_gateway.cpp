@@ -1,4 +1,5 @@
 #include "can_gateway/signal_decoder.hpp"
+#include "can_gateway/body_command_sender.hpp"
 #include "can_gateway/socketcan_receiver.hpp"
 #include "vehicle_service/vehicle_data_format.hpp"
 #include "vehicle_service/vehicle_service.hpp"
@@ -8,6 +9,7 @@
 #include <chrono>
 #include <csignal>
 #include <cstdlib>
+#include <functional>
 #include <iostream>
 #include <string>
 #include <thread>
@@ -34,16 +36,31 @@ int main(int argc, char* argv[]) {
     }
 
     can_gateway::SocketCanReceiver receiver;
+    can_gateway::BodyCommandSender command_sender;
     std::string error;
     if (!receiver.open(interface_name, error)) {
         std::cerr << error << '\n';
         return 1;
     }
+    const bool body_commands_enabled = command_sender.open(interface_name, error);
+    if (!body_commands_enabled) {
+        std::cerr << "Body commands unavailable: " << error << '\n';
+    }
 
     vehicle_service::VehicleService service;
     const can_gateway::SignalDecoder decoder;
     auto application = vsomeip::runtime::get()->create_application("vehicle-provider");
-    vehicle_someip::VehicleDataProvider provider(application, service);
+    vehicle_someip::VehicleDataProvider provider(
+        application, service,
+        body_commands_enabled
+            ? std::function<bool(std::uint8_t, bool)>(
+                  [&command_sender](std::uint8_t door, bool open) {
+                      std::string send_error;
+                      if (command_sender.send(door, open, send_error)) return true;
+                      std::cerr << send_error << '\n';
+                      return false;
+                  })
+            : std::function<bool(std::uint8_t, bool)>{});
     const char* configuration = std::getenv("VSOMEIP_CONFIGURATION");
     std::cerr << "[SOMEIP] application=" << application->get_name()
               << " VSOMEIP_CONFIGURATION="
@@ -66,6 +83,12 @@ int main(int argc, char* argv[]) {
                 service.update(*data);
                 provider.publish(*data);
                 std::cout << vehicle_service::format_vehicle_data(*data) << std::endl;
+            } else if (const auto body = decoder.decode_body(frame)) {
+                service.updateBody(*body);
+                provider.publishBody(*body);
+                std::cout << "body_status_flags=0x" << std::hex
+                          << static_cast<unsigned int>(body->flags) << std::dec
+                          << std::endl;
             }
         }, receive_error);
         if (!okay) {

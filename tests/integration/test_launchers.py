@@ -53,7 +53,11 @@ def test_argument_and_missing_binary_errors():
         ([str(SERVER), "--interface", "vcan999"], {}, 1, "is missing"),
         ([str(SERVER)], {"VEHICLE_GATEWAY_BIN": "/tmp/missing-vehicle-gateway"}, 1, "Gateway executable missing"),
         ([str(CLIENT), "subscribe", "zero"], {}, 2, "Event count must be"),
+        ([str(CLIENT), "body-subscribe", "zero"], {}, 2, "Event count must be"),
+        ([str(CLIENT), "door", "5", "open"], {}, 2, "Usage:"),
+        ([str(CLIENT), "door", "0", "lock"], {}, 2, "Usage:"),
         ([str(CLIENT), "method"], {"VEHICLE_CLIENT_BIN": "/tmp/missing-vehicle-client"}, 1, "Client executable missing"),
+        ([str(CLIENT), "body"], {"VEHICLE_BODY_CLIENT_BIN": "/tmp/missing-vehicle-body-client"}, 1, "Client executable missing"),
     ]
     for command, extra_env, code, message in cases:
         result = subprocess.run(

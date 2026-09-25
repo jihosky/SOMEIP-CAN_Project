@@ -1,5 +1,7 @@
 # Milestone 2C runbook
 
+For current workplace body-control and GUI commands, see [한국어 실행 명령](commands_ko.md). The 192.168.50.x examples below document the earlier home-network verification.
+
 Run these commands on Linux or WSL from the repository root. The examples use /home/jiho/Portfolio/SOMEIP-CAN_Project; change that path if your checkout is elsewhere. The two-terminal launchers are the preferred manual check. The original five-terminal procedure remains below for debugging.
 
 ## Prerequisites and clean build

@@ -10,7 +10,12 @@ from virtual_ecu.__main__ import (
     ENGINE_RPM,
     VEHICLE_SPEED_KPH,
     make_message,
+    make_body_message,
+    apply_body_command,
+    BODY_DEFINITION,
 )
+
+import can
 
 
 def test_milestone_frame_is_standard_and_deterministic():
@@ -32,3 +37,15 @@ def test_acceleration_payload_sequence_is_deterministic():
         bytes.fromhex("A0 0F 08 07 6F 00 00 00"),
         bytes.fromhex("70 17 60 09 70 00 00 00"),
     ]
+
+
+def test_body_can_command_changes_only_requested_door():
+    assert make_body_message(0x11).arbitration_id == BODY_DEFINITION["can_id"] == 0x200
+    assert make_body_message(0x11).data == bytes([0x11])
+    command = can.Message(arbitration_id=BODY_DEFINITION["command_can_id"],
+                          is_extended_id=False, data=[0, 1])
+    assert apply_body_command(0, command) == 1
+    command.data = bytearray([0, 0])
+    assert apply_body_command(0x11, command) == 0x10
+    command.data = bytearray([5, 1])
+    assert apply_body_command(0, command) is None

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VehicleData | SOME/IP Dashboard</title>
+<style>
+:root { color-scheme: dark; font-family: Inter, system-ui, sans-serif; background: #091321; color: #eaf5ff; }
+* { box-sizing: border-box; }
+body { margin: 0; min-height: 100vh; background: radial-gradient(circle at 40% 10%, #183556, #091321 62%); }
+main { max-width: 1120px; margin: auto; padding: 34px 24px; }
+header { display: flex; align-items: center; justify-content: space-between; gap: 18px; flex-wrap: wrap; margin-bottom: 24px; }
+h1 { margin: 0; font-size: clamp(1.6rem, 4vw, 2.4rem); letter-spacing: .05em; }
+.subtitle, .muted { color: #9db2c8; }
+.subtitle { margin: 8px 0 0; }
+.status { display: flex; align-items: center; gap: 10px; padding: 11px 16px; background: #172a40; border: 1px solid #375169; border-radius: 99px; font-weight: 650; }
+.dot { height: 11px; width: 11px; border-radius: 50%; background: #f1bc6b; box-shadow: 0 0 13px #f1bc6b; }
+.status.live .dot { background: #55e3b2; box-shadow: 0 0 16px #55e3b2; animation: pulse 1s ease-in-out infinite alternate; }
+@keyframes pulse { to { opacity: .35; transform: scale(.75); } }
+.panel { background: #13253a; border: 1px solid #2c4965; border-radius: 24px; padding: 30px; display: grid; grid-template-columns: 1.15fr 1fr; gap: 30px; box-shadow: 0 26px 80px #0005; }
+.vehicle { display: flex; flex-direction: column; align-items: center; justify-content: center; border-right: 1px solid #2c4965; min-height: 440px; }
+.vehicle svg { width: min(100%, 360px); height: 360px; }
+.vehicle path, .vehicle rect, .vehicle circle { transition: fill .3s, stroke .3s; }
+.signal { fill: none; stroke: #637d96; stroke-width: 5; }
+.live .signal { stroke: #55e3b2; animation: pulse 1s ease-in-out infinite alternate; }
+.readings { display: grid; grid-template-rows: repeat(3, 1fr); gap: 14px; }
+.card { background: #1b3048; border: 1px solid #35516b; border-radius: 16px; padding: 19px 22px; display: flex; flex-direction: column; justify-content: center; }
+.label { font-size: .82rem; font-weight: 750; letter-spacing: .14em; color: #a6bdd2; }
+.value { margin-top: 8px; font-size: clamp(2rem, 4vw, 3.3rem); font-weight: 780; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.unit { font-size: .9rem; font-weight: 500; color: #bdd0e0; }
+.speed { color: #63dce9; } .rpm { color: #f5c171; } .coolant { color: #ff9397; }
+footer { margin-top: 18px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: .9rem; }
+@media (max-width: 760px) { .panel { grid-template-columns: 1fr; } .vehicle { min-height: 300px; border-right: 0; border-bottom: 1px solid #2c4965; } .vehicle svg { height: 260px; } }
+
+.body-panel { margin-top: 20px; background: #13253a; border: 1px solid #2c4965; border-radius: 24px; padding: 24px 30px; }
+.body-panel h2 { margin: 0 0 18px; font-size: 1.15rem; letter-spacing: .04em; }
+.body-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.body-item { background: #1b3048; border: 1px solid #35516b; border-radius: 14px; padding: 16px; min-height: 84px; }
+.body-item span { display: block; color: #a6bdd2; font-size: .82rem; margin-bottom: 9px; }
+.body-item strong { color: #f5c171; font-size: 1.05rem; }
+.body-item.closed strong { color: #55e3b2; }
+.body-item.unknown strong { color: #91a6bc; }
+.car-opening { fill: #29506e; stroke: #8bc7ed; stroke-width: 2; }
+.car-opening.open { fill: #ffb75e; stroke: #ffd492; }
+.control-panel { margin-top: 20px; background: #13253a; border: 1px solid #2c4965; border-radius: 24px; padding: 24px 30px; display: flex; justify-content: space-between; gap: 20px; align-items: center; flex-wrap: wrap; }
+.control-panel h2 { margin: 0 0 7px; font-size: 1.15rem; }
+.control-panel p { margin: 7px 0; }
+.control-panel b { color: #eaf5ff; }
+.buttons { display: flex; gap: 10px; }
+button { border: 1px solid #66b9db; border-radius: 12px; background: #226487; color: #fff; padding: 13px 18px; cursor: pointer; font-weight: 700; }
+button:last-child { background: #314760; border-color: #63809d; }
+button:disabled { cursor: not-allowed; opacity: .4; }
+@media (max-width: 760px) { .body-grid { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<main>
+<header><div><h1>VEHICLE DATA</h1><p class="subtitle">Virtual ECU → CAN Gateway → SOME/IP → Dashboard</p></div><div id="status-pill" class="status"><span class="dot"></span><span id="status">Connecting</span></div></header>
+<section class="panel"><div id="vehicle" class="vehicle">
+<svg viewBox="0 0 360 360" role="img" aria-label="Top view of a car receiving vehicle data">
+<ellipse cx="174" cy="330" rx="90" ry="13" fill="#07111e"/>
+<rect x="100" y="67" width="160" height="266" rx="44" fill="#3976a4" stroke="#8bc7ed" stroke-width="5"/>
+<rect x="83" y="110" width="20" height="54" rx="7" fill="#07111e"/><rect x="257" y="110" width="20" height="54" rx="7" fill="#07111e"/>
+<rect x="83" y="245" width="20" height="54" rx="7" fill="#07111e"/><rect x="257" y="245" width="20" height="54" rx="7" fill="#07111e"/>
+<path d="M129 149 L148 101 Q180 90 212 101 L231 149 Z" fill="#0a263e" stroke="#9dd2ef" stroke-width="3"/>
+<path d="M136 224 L224 224 L232 275 Q180 291 128 275 Z" fill="#0a263e" stroke="#9dd2ef" stroke-width="3"/>
+<rect x="123" y="69" width="31" height="10" rx="5" fill="#dcf9ff"/><rect x="206" y="69" width="31" height="10" rx="5" fill="#dcf9ff"/>
+<rect id="visual-driver" class="car-opening" x="96" y="173" width="13" height="44" rx="3"/>
+<rect id="visual-passenger" class="car-opening" x="251" y="173" width="13" height="44" rx="3"/>
+<rect id="visual-rear-left" class="car-opening" x="96" y="231" width="13" height="43" rx="3"/>
+<rect id="visual-rear-right" class="car-opening" x="251" y="231" width="13" height="43" rx="3"/>
+<rect id="visual-trunk" class="car-opening" x="145" y="307" width="70" height="10" rx="3"/>
+<circle class="signal" cx="309" cy="197" r="18"/><circle class="signal" cx="309" cy="197" r="34" opacity=".5"/>
+</svg><span class="muted" id="latest">Waiting for VehicleData event</span></div>
+<div class="readings"><div class="card"><span class="label">SPEED</span><span class="value speed"><span id="speed">—</span> <span class="unit">km/h</span></span></div><div class="card"><span class="label">ENGINE RPM</span><span class="value rpm"><span id="rpm">—</span> <span class="unit">rpm</span></span></div><div class="card"><span class="label">COOLANT</span><span class="value coolant"><span id="coolant">—</span> <span class="unit">°C</span></span></div></div></section>
+<section class="body-panel"><h2>문 · 트렁크 상태 <span class="muted" id="body-fresh">상태 대기</span></h2>
+<div class="body-grid">
+<div id="body-driver" class="body-item unknown"><span>운전석 문</span><strong>확인 중</strong></div>
+<div id="body-passenger" class="body-item unknown"><span>조수석 문</span><strong>확인 중</strong></div>
+<div id="body-rear_left" class="body-item unknown"><span>뒷좌석 왼쪽</span><strong>확인 중</strong></div>
+<div id="body-rear_right" class="body-item unknown"><span>뒷좌석 오른쪽</span><strong>확인 중</strong></div>
+<div id="body-trunk" class="body-item unknown"><span>트렁크</span><strong>확인 중</strong></div>
+</div></section>
+<section class="control-panel"><div><h2>가상 운전석 문</h2>
+<p class="muted">명령 접수: <b id="command-acceptance">No command</b></p>
+<p class="muted">실제 상태 확인: <b id="command-result">—</b></p></div>
+<div class="buttons"><button id="open-door" disabled>문 열기</button><button id="close-door" disabled>문 닫기</button></div></section>
+<footer class="muted"><span id="profile">SOME/IP profile: pc</span><span id="count">Events received: 0</span></footer>
+</main>
+<script>
+const bodyKeys = ['driver', 'passenger', 'rear_left', 'rear_right', 'trunk'];
+const visualIds = ['visual-driver', 'visual-passenger', 'visual-rear-left', 'visual-rear-right', 'visual-trunk'];
+async function sendDoor(action) {
+  for (const id of ['open-door', 'close-door']) document.getElementById(id).disabled = true;
+  try {
+    const response = await fetch('/api/door', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({action})});
+    const result = await response.json();
+    if (!response.ok) document.getElementById('command-result').textContent = result.message;
+  } catch (_) {
+    document.getElementById('command-result').textContent = 'Dashboard connection lost';
+  }
+  refresh();
+}
+document.getElementById('open-door').addEventListener('click', () => sendDoor('open'));
+document.getElementById('close-door').addEventListener('click', () => sendDoor('close'));
+async function refresh() {
+  try {
+    const response = await fetch('/api/state', {cache: 'no-store'});
+    if (!response.ok) throw new Error('Dashboard unavailable');
+    const state = await response.json();
+    document.getElementById('status').textContent = state.status;
+    document.getElementById('status-pill').classList.toggle('live', state.connected);
+    document.getElementById('vehicle').classList.toggle('live', state.connected);
+    document.getElementById('speed').textContent = state.speed === null ? '—' : state.speed.toFixed(2);
+    document.getElementById('rpm').textContent = state.rpm ?? '—';
+    document.getElementById('coolant').textContent = state.coolant ?? '—';
+    document.getElementById('latest').textContent = state.updated_at ? `Last event ${state.updated_at}` : 'Waiting for VehicleData event';
+    document.getElementById('profile').textContent = `SOME/IP profile: ${state.profile}`;
+    document.getElementById('count').textContent = `Events received: ${state.count}`;
+    document.getElementById('body-fresh').textContent = state.body_fresh ? '● 실시간' : '● 연결 대기 또는 오래된 상태';
+    for (let i = 0; i < bodyKeys.length; i++) {
+      const item = document.getElementById(`body-${bodyKeys[i]}`);
+      const isOpen = state.body === null ? null : state.body[bodyKeys[i]];
+      item.className = `body-item ${isOpen === null ? 'unknown' : isOpen ? 'open' : 'closed'}`;
+      item.querySelector('strong').textContent = isOpen === null ? '확인 중' : isOpen ? '열림' : '닫힘';
+      document.getElementById(visualIds[i]).classList.toggle('open', isOpen === true);
+    }
+    document.getElementById('command-acceptance').textContent = state.command_acceptance;
+    document.getElementById('command-result').textContent = state.command_result;
+    for (const id of ['open-door', 'close-door']) document.getElementById(id).disabled = !state.connected || state.pending;
+  } catch (_) {
+    document.getElementById('status').textContent = 'Dashboard disconnected';
+    document.getElementById('status-pill').classList.remove('live');
+    document.getElementById('vehicle').classList.remove('live');
+    for (const id of ['open-door', 'close-door']) document.getElementById(id).disabled = true;
+  }
+}
+refresh(); setInterval(refresh, 500);
+</script>
+</body>
+</html>

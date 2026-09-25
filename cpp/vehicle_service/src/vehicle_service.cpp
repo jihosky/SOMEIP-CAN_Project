@@ -7,6 +7,16 @@ void VehicleService::update(VehicleData data) {
     latest_ = data;
 }
 
+void VehicleService::updateBody(BodyStatus status) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    body_status_ = status;
+}
+
+std::optional<BodyStatus> VehicleService::bodyStatus() const {
+    std::lock_guard<std::mutex> lock(mutex_);
+    return body_status_;
+}
+
 std::optional<VehicleData> VehicleService::latest() const {
     std::lock_guard<std::mutex> lock(mutex_);
     return latest_;

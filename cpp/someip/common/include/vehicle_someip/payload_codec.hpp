@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "vehicle_service/vehicle_data.hpp"
+#include "vehicle_service/body_status.hpp"
 
 namespace vehicle_someip {
 
@@ -19,6 +20,10 @@ std::optional<double> decode_speed(const std::uint8_t* data, std::size_t length)
 std::optional<std::uint16_t> decode_rpm(const std::uint8_t* data, std::size_t length);
 std::optional<std::int16_t> decode_temperature(const std::uint8_t* data, std::size_t length);
 std::optional<vehicle_service::VehicleData> decode_vehicle_data(
+    const std::uint8_t* data, std::size_t length);
+
+std::vector<std::uint8_t> encode_body_status(const vehicle_service::BodyStatus& status);
+std::optional<vehicle_service::BodyStatus> decode_body_status(
     const std::uint8_t* data, std::size_t length);
 
 }  // namespace vehicle_someip

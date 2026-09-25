@@ -10,6 +10,7 @@ import can
 
 DEFINITION_PATH = Path(__file__).resolve().parents[2] / "config" / "can" / "milestone1.json"
 DEFINITION = json.loads(DEFINITION_PATH.read_text())
+BODY_DEFINITION = json.loads((DEFINITION_PATH.parent / "body.json").read_text())
 
 VEHICLE_SPEED_KPH = 123.45
 ENGINE_RPM = 2500
@@ -49,6 +50,27 @@ def make_message(sample=STEADY_SAMPLE) -> can.Message:
     )
 
 
+def make_body_message(flags: int) -> can.Message:
+    if not 0 <= flags < 128:
+        raise ValueError("body status flags must fit in seven bits")
+    return can.Message(
+        arbitration_id=BODY_DEFINITION["can_id"],
+        is_extended_id=False,
+        data=bytes((flags,)),
+    )
+
+
+def apply_body_command(flags: int, message: can.Message) -> int | None:
+    if (message.is_extended_id or message.arbitration_id != BODY_DEFINITION["command_can_id"]
+            or len(message.data) != BODY_DEFINITION["command_dlc"]):
+        return None
+    door, open_value = message.data
+    if door > BODY_DEFINITION["trunk_open_bit"] or open_value > 1:
+        return None
+    mask = 1 << door
+    return (flags | mask) if open_value else (flags & ~mask)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--interface", default="vcan0", help="SocketCAN interface name")
@@ -78,10 +100,23 @@ def main() -> int:
                 else ACCELERATION_SAMPLES
             )
             index = 0
+            body_flags = 0
             while True:
                 bus.send(make_message(samples[index % len(samples)]))
+                bus.send(make_body_message(body_flags))
                 index += 1
-                time.sleep(args.interval)
+                deadline = time.monotonic() + args.interval
+                while True:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    command = bus.recv(timeout=remaining)
+                    if command is None:
+                        break
+                    updated = apply_body_command(body_flags, command)
+                    if updated is not None:
+                        body_flags = updated
+                        bus.send(make_body_message(body_flags))
     except KeyboardInterrupt:
         print("Stopped virtual ECU.")
     except (can.CanError, OSError) as error:

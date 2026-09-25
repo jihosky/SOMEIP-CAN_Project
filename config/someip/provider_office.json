@@ -1,7 +1,7 @@
 {
-  "unicast": "127.0.0.1",
+  "unicast": "192.168.137.69",
   "logging": {
-    "level": "error",
+    "level": "debug",
     "console": "true",
     "dlt": "false"
   },
@@ -9,10 +9,6 @@
     {
       "name": "vehicle-provider",
       "id": "0x6301"
-    },
-    {
-      "name": "vehicle-client",
-      "id": "0x6302"
     }
   ],
   "services": [
@@ -63,5 +59,7 @@
     "repetitions_max": "3",
     "ttl": "3",
     "cyclic_offer_delay": "1000"
-  }
+  },
+  "netmask": "255.255.255.0",
+  "device": "eth0"
 }

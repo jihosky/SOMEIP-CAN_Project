@@ -1,0 +1,17 @@
+#pragma once
+
+#include <cstdint>
+
+namespace body_definition {
+constexpr std::uint32_t can_id = @BODY_CAN_ID@;
+constexpr std::uint8_t dlc = @BODY_DLC@;
+constexpr std::uint32_t command_can_id = @BODY_COMMAND_CAN_ID@;
+constexpr std::uint8_t command_dlc = @BODY_COMMAND_DLC@;
+constexpr std::uint8_t driver_door_open_bit = @BODY_DRIVER_DOOR_OPEN_BIT@;
+constexpr std::uint8_t passenger_door_open_bit = @BODY_PASSENGER_DOOR_OPEN_BIT@;
+constexpr std::uint8_t rear_left_door_open_bit = @BODY_REAR_LEFT_DOOR_OPEN_BIT@;
+constexpr std::uint8_t rear_right_door_open_bit = @BODY_REAR_RIGHT_DOOR_OPEN_BIT@;
+constexpr std::uint8_t trunk_open_bit = @BODY_TRUNK_OPEN_BIT@;
+constexpr std::uint8_t doors_locked_bit = @BODY_DOORS_LOCKED_BIT@;
+constexpr std::uint8_t headlights_on_bit = @BODY_HEADLIGHTS_ON_BIT@;
+}  // namespace body_definition
