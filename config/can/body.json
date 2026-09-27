@@ -1,0 +1,13 @@
+{
+  "can_id": 512,
+  "dlc": 1,
+  "command_can_id": 513,
+  "command_dlc": 2,
+  "driver_door_open_bit": 0,
+  "passenger_door_open_bit": 1,
+  "rear_left_door_open_bit": 2,
+  "rear_right_door_open_bit": 3,
+  "trunk_open_bit": 4,
+  "doors_locked_bit": 5,
+  "headlights_on_bit": 6
+}

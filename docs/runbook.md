@@ -1,5 +1,8 @@
 # Milestone 2C runbook
 
+For virtual door/trunk status, SOME/IP body methods/events, and the PC GUI
+handoff contract, see [body_control_protocol.md](body_control_protocol.md).
+
 Run these commands on Linux or WSL from the repository root. The examples use /home/jiho/Portfolio/SOMEIP-CAN_Project; change that path if your checkout is elsewhere. The two-terminal launchers are the preferred manual check. The original five-terminal procedure remains below for debugging.
 
 ## Prerequisites and clean build
@@ -229,3 +232,106 @@ After the event client exits, press Ctrl+C in Terminal 2 to stop the ECU, then C
 | Routing manager conflict | Only one process should own the configured vehicle-provider routing manager. Stop another vehicle_gateway or vehicle_data_provider with Ctrl+C. Inspect running processes with pgrep -af 'vehicle_gateway|vehicle_data_provider|vehicle_data_client'. |
 
 For an automated check after the manual run, use ./.venv/bin/python -m pytest tests/integration/test_someip_events.py -m integration -q with vcan0 up and no manually running gateway or client.
+
+## Raspberry Pi 5 provider and PC/WSL client over Ethernet
+
+As reported by the user on 2026-09-27, the Pi now uses the fixed address
+`eth0=192.168.137.2/24`. `provider_pi.json` contains `192.168.137.2`.
+Use `./scripts/run_vehicle_server.sh --someip-profile pi --scenario acceleration`.
+`work` remains an alias for the same file. Before starting, check
+`ip route get 224.244.224.245`: it should use eth0 with source 192.168.137.2.
+The previous 2026-09-25 tests used the DHCP address 192.168.137.69; those
+results do not establish connectivity after this address change. For the legacy home
+`192.168.50.2` setup, use `--someip-profile home`, which selects the
+existing `provider.json`; `home` and `default` select the same file.
+These aliases keep both current JSON configurations intact. The PC/WSL
+client configuration must separately match the address owned by the PC/WSL
+at each location; the existing `client_pc.json` still says `192.168.50.1`.
+
+Use separate host profiles; `--someip-profile pi` selects `provider_pi.json`,
+while `--someip-profile pc` selects `client_pc.json`. Both launchers print and
+export the exact `VSOMEIP_CONFIGURATION` path and `VSOMEIP_APPLICATION_NAME`.
+Without the option, they retain the existing provider.json/client.json behavior.
+Those default files may have local edits; inspect their unicast addresses before
+using the earlier local demo instructions. The current Pi profile uses
+192.168.137.2 and routes through vehicle-provider; the home/default provider
+profile uses 192.168.50.2. The PC profile uses 192.168.50.1 and its own
+vehicle-client routing manager; a routing manager is local to each host.
+
+The following 192.168.50.x commands and results document the 2026-09-23 home
+network investigation. Use the workplace procedure above while eth0 is on
+192.168.137.0/24.
+
+On the Pi, verify the interfaces and routes before starting:
+
+~~~sh
+ip addr show eth0
+ip link show vcan0
+ip route get 192.168.50.1
+ip route get 224.244.224.245
+~~~
+
+eth0 must be UP with 192.168.50.2/24, vcan0 must be UP, and both destinations
+must use eth0. If the multicast lookup uses wlan0, the Wi-Fi default route is
+winning because no more specific multicast route exists. Add a temporary route:
+
+~~~sh
+sudo ip route replace 224.244.224.245/32 dev eth0
+ip route get 224.244.224.245
+./scripts/run_vehicle_server.sh --someip-profile pi --scenario acceleration --interface vcan0 --interval 1.0
+~~~
+
+This route is not persistent across reboot/network reconfiguration. To undo this
+specific added route, use `sudo ip route del 224.244.224.245/32 dev eth0`.
+The launcher does not modify host routes. Keep the server running, then inspect
+its actual environment and sockets in another terminal:
+
+~~~sh
+pid=$(pgrep -x vehicle_gateway)
+tr '\0' '\n' < /proc/"$pid"/environ | grep '^VSOMEIP_'
+ss -lntp '( sport = :30540 )'
+ss -lunp '( sport = :30490 )'
+ip maddr show dev eth0
+sudo timeout 10 tcpdump -ni any -vv 'udp port 30490 or tcp port 30540'
+sudo timeout 10 tcpdump -ni eth0 -vv -XX 'udp port 30490 or tcp port 30540'
+~~~
+
+A timeout exit status of 124 is expected for these bounded captures. Expected
+bindings are TCP 192.168.50.2:30540 and SD UDP 192.168.50.2:30490 plus the
+multicast receiver at 0.0.0.0:30490. Check ST_REGISTERED, REGISTER EVENT,
+ON_OFFER_SERVICE, and endpoint creation in the logs. A healthy CAN stream or
+"gateway ready" banner alone does not establish Ethernet readiness.
+
+Runtime investigation on 2026-09-23 (Pi, vSomeIP 3.7.6): with multicast routed
+through wlan0, registration and offering succeeded but the service remained in
+pending_sd_offers, neither port was bound, and an all-interface capture observed
+zero packets. Adding the eth0 multicast route to the same running process
+immediately created both endpoints and cleared pending_sd_offers. An eth0
+capture observed eight outgoing SD packets in six seconds. The payload contained
+an OfferService entry (type 0x01), service 0x6301, instance 0x0001, TTL 3, and an
+IPv4 endpoint option advertising TCP 192.168.50.2:30540. This proves provider
+emission on Ethernet; it does not prove receipt or responses on the PC.
+The provider also logged missing incoming multicast SD messages while no peer
+client was running; inbound SD still needs verification.
+
+On the PC/WSL checkout, ensure the updated launcher and client_pc.json are
+present and built. The Linux environment running the client must actually own
+192.168.50.1/24 and route both the Pi address and SD multicast through the
+Ethernet-facing interface. Inspect with `ip addr` and `ip route get`; do not
+assume the Windows host address also belongs to WSL. Then run:
+
+~~~sh
+./scripts/run_vehicle_client.sh --someip-profile pc method
+./scripts/run_vehicle_client.sh --someip-profile pc subscribe 3
+~~~
+
+Capture on both ends while running these commands. Require successful method
+replies and three changing events, correlated with Ethernet traffic, before
+marking multi-host communication complete. Pi-only tests do not satisfy that
+milestone.
+
+The final Pi-profile run again emitted offers on eth0 and listened on TCP
+30540, but two ping probes to 192.168.50.1 received no replies. Earlier reports
+of working ping were not reproduced in this session. Recheck the peer address,
+link, and ICMP policy before interpreting a client timeout; the ping result
+alone does not identify the peer-side cause.

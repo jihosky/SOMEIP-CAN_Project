@@ -1,6 +1,7 @@
 #include "can_gateway/signal_decoder.hpp"
 
 #include "milestone1_definition.hpp"
+#include "body_definition.hpp"
 
 #include <cstdint>
 
@@ -35,6 +36,15 @@ std::optional<vehicle_service::VehicleData> SignalDecoder::decode(
         static_cast<std::int16_t>(static_cast<int>(raw_temperature) + temperature_offset),
         frame.received_at,
     };
+}
+
+std::optional<vehicle_service::BodyStatus> SignalDecoder::decode_body(
+    const CanFrame& frame) const {
+    if (frame.id != body_definition::can_id || frame.dlc != body_definition::dlc ||
+        (frame.payload[0] & 0x80) != 0) {
+        return std::nullopt;
+    }
+    return vehicle_service::BodyStatus{frame.payload[0], frame.received_at};
 }
 
 }  // namespace can_gateway

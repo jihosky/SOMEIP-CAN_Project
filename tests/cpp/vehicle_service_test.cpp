@@ -24,6 +24,15 @@ int main() {
         std::cerr << "Service did not expose latest vehicle data\n";
         return 1;
     }
+    if (service.bodyStatus()) {
+        std::cerr << "Body status exists before CAN update\n";
+        return 1;
+    }
+    service.updateBody({0x11, data.timestamp});
+    if (!service.bodyStatus() || service.bodyStatus()->flags != 0x11) {
+        std::cerr << "Body status update was lost\n";
+        return 1;
+    }
 
     const std::string expected =
         "1970-01-01T00:00:00.000Z vehicle_speed_kph=123.45 "

@@ -1,5 +1,6 @@
 #include "can_gateway/signal_decoder.hpp"
 #include "milestone1_definition.hpp"
+#include "body_definition.hpp"
 
 #include <chrono>
 #include <cmath>
@@ -50,5 +51,17 @@ int main() {
     frame.dlc = milestone1_definition::dlc;
     frame.id = 0x101;
     if (!check(!decoder.decode(frame), "Other CAN ID must be ignored")) return 1;
+
+    frame.id = body_definition::can_id;
+    frame.dlc = body_definition::dlc;
+    frame.payload = {0x11, 0, 0, 0, 0, 0, 0, 0};
+    const auto body = decoder.decode_body(frame);
+    if (!check(body && body->flags == 0x11 && body->timestamp == frame.received_at,
+               "Body status frame did not decode")) return 1;
+    frame.payload[0] = 0x80;
+    if (!check(!decoder.decode_body(frame), "Reserved body bit was accepted")) return 1;
+    frame.payload[0] = 0;
+    frame.dlc = 2;
+    if (!check(!decoder.decode_body(frame), "Wrong body DLC was accepted")) return 1;
     return 0;
 }

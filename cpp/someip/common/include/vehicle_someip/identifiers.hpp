@@ -9,7 +9,11 @@ constexpr std::uint16_t instance_id = 0x0001;
 constexpr std::uint16_t get_vehicle_speed_id = 0x0001;
 constexpr std::uint16_t get_engine_rpm_id = 0x0002;
 constexpr std::uint16_t get_coolant_temperature_id = 0x0003;
+constexpr std::uint16_t get_body_status_id = 0x0004;
+constexpr std::uint16_t set_door_id = 0x0005;
 constexpr std::uint16_t vehicle_data_event_id = 0x8001;
 constexpr std::uint16_t vehicle_data_eventgroup_id = 0x0001;
+constexpr std::uint16_t body_status_event_id = 0x8002;
+constexpr std::uint16_t body_status_eventgroup_id = 0x0002;
 
 }  // namespace vehicle_someip

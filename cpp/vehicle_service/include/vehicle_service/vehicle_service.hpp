@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vehicle_service/vehicle_data.hpp"
+#include "vehicle_service/body_status.hpp"
 
 #include <optional>
 #include <mutex>
@@ -14,10 +15,13 @@ public:
     std::optional<double> getVehicleSpeed() const;
     std::optional<std::uint16_t> getEngineRpm() const;
     std::optional<std::int16_t> getCoolantTemperature() const;
+    void updateBody(BodyStatus status);
+    std::optional<BodyStatus> bodyStatus() const;
 
 private:
     mutable std::mutex mutex_;
     std::optional<VehicleData> latest_;
+    std::optional<BodyStatus> body_status_;
 };
 
 }  // namespace vehicle_service

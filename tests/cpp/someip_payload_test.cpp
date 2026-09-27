@@ -54,5 +54,13 @@ int main() {
         std::cerr << "Incorrect VehicleData event decoding\n";
         return 1;
     }
+    const vehicle_service::BodyStatus body{0x11, {}};
+    const auto body_bytes = encode_body_status(body);
+    const auto decoded_body = decode_body_status(body_bytes.data(), body_bytes.size());
+    if (body_bytes != std::vector<std::uint8_t>{0x11} || !decoded_body ||
+        decoded_body->flags != 0x11 || decode_body_status(body_bytes.data(), 0)) {
+        std::cerr << "Incorrect BodyStatus payload coding\n";
+        return 1;
+    }
     return 0;
 }

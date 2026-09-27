@@ -67,4 +67,15 @@ std::optional<vehicle_service::VehicleData> decode_vehicle_data(
     return vehicle_service::VehicleData{*speed, *rpm, *temperature, {}};
 }
 
+std::vector<std::uint8_t> encode_body_status(
+    const vehicle_service::BodyStatus& status) {
+    return {status.flags};
+}
+
+std::optional<vehicle_service::BodyStatus> decode_body_status(
+    const std::uint8_t* data, std::size_t length) {
+    if (data == nullptr || length != 1 || (data[0] & 0x80) != 0) return std::nullopt;
+    return vehicle_service::BodyStatus{data[0], {}};
+}
+
 }  // namespace vehicle_someip

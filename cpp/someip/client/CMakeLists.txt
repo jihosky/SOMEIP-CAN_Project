@@ -1,2 +1,5 @@
 add_executable(vehicle_data_client src/vehicle_data_client.cpp)
 target_link_libraries(vehicle_data_client PRIVATE vehicle_someip_common vsomeip3)
+
+add_executable(vehicle_body_client src/vehicle_body_client.cpp)
+target_link_libraries(vehicle_body_client PRIVATE vehicle_someip_common vsomeip3)

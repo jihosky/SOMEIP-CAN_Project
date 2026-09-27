@@ -3,13 +3,14 @@ set -Eeuo pipefail
 
 script_dir="$(cd -- "$(dirname -- "$0")" && pwd)"
 repo_root="$(cd -- "$script_dir/.." && pwd)"
+someip_profile=default
 scenario=steady
 interval=1.0
 interface=vcan0
 gateway_pid=""
 ecu_pid=""
 
-usage() { printf 'Usage: %s [--scenario steady|acceleration] [--interval SECONDS] [--interface NAME]\n' "$0"; }
+usage() { printf 'Usage: %s [--someip-profile default|home|pi|work] [--scenario steady|acceleration] [--interval SECONDS] [--interface NAME]\n' "$0"; }
 log() { printf '[SETUP] %s\n' "$*"; }
 prefix_lines() {
     local component="$1" line
@@ -22,7 +23,10 @@ stop_child() {
 }
 cleanup() {
     local status=$? pid attempt
-    trap - EXIT INT TERM
+    trap - EXIT INT TERM HUP
+    if [[ -n "$ecu_pid" || -n "$gateway_pid" ]]; then
+        log "Stopping server processes (gateway=${gateway_pid:-none}, ECU=${ecu_pid:-none})..."
+    fi
     stop_child "$ecu_pid"
     stop_child "$gateway_pid"
     for pid in "$ecu_pid" "$gateway_pid"; do
@@ -37,17 +41,22 @@ cleanup() {
         fi
         wait "$pid" 2>/dev/null || true
     done
+    if [[ -n "$ecu_pid" || -n "$gateway_pid" ]]; then
+        log "Server processes stopped."
+    fi
     exit "$status"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 while (($#)); do
     case "$1" in
-        --scenario|--interval|--interface)
+        --someip-profile|--scenario|--interval|--interface)
             if (($# < 2)); then usage >&2; exit 2; fi
             case "$1" in
+                --someip-profile) someip_profile="$2" ;;
                 --scenario) scenario="$2" ;;
                 --interval) interval="$2" ;;
                 --interface) interface="$2" ;;
@@ -63,6 +72,12 @@ fi
 if [[ ! "$interface" =~ ^[A-Za-z0-9_.-]{1,15}$ ]]; then
     printf '[SETUP] Invalid CAN interface name: %s\n' "$interface" >&2; exit 2
 fi
+
+case "$someip_profile" in
+    default|home) someip_config="$repo_root/config/someip/provider.json" ;;
+    pi|work) someip_config="$repo_root/config/someip/provider_pi.json" ;;
+    *) printf '[SETUP] Unknown SOME/IP profile: %s\n' "$someip_profile" >&2; exit 2 ;;
+esac
 
 python_bin="${VEHICLE_PYTHON:-}"
 if [[ -z "$python_bin" ]]; then
@@ -84,7 +99,16 @@ if [[ ! -x "$gateway_bin" ]]; then
     printf '[SETUP] Build it with: cmake -S . -B build -G Ninja && cmake --build build\n' >&2
     exit 1
 fi
-if [[ ! -f "$repo_root/config/someip/provider.json" ]]; then
+if command -v pgrep >/dev/null 2>&1; then
+    existing_gateway_pids="$(pgrep -x vehicle_gateway || true)"
+    if [[ -n "$existing_gateway_pids" ]]; then
+        printf '[SETUP] vehicle_gateway is already running (PID(s): %s).\n' \
+            "${existing_gateway_pids//$'\n'/, }" >&2
+        printf '[SETUP] Use the existing server, or stop its launcher with Ctrl+C before starting another.\n' >&2
+        exit 1
+    fi
+fi
+if [[ ! -f "$someip_config" ]]; then
     printf '[SETUP] vSomeIP provider config missing\n' >&2; exit 1
 fi
 if ! PYTHONPATH="$repo_root/python" "$python_bin" -c 'import can, virtual_ecu.__main__' >/dev/null 2>&1; then
@@ -108,7 +132,10 @@ fi
 log "$interface available"
 log "Using Python: $python_bin"
 
-export VSOMEIP_CONFIGURATION="$repo_root/config/someip/provider.json"
+export VSOMEIP_CONFIGURATION="$someip_config"
+export VSOMEIP_APPLICATION_NAME=vehicle-provider
+log "VSOMEIP_CONFIGURATION=$VSOMEIP_CONFIGURATION"
+log "VSOMEIP_APPLICATION_NAME=$VSOMEIP_APPLICATION_NAME"
 log "Starting vehicle gateway..."
 "$gateway_bin" --interface "$interface" > >(prefix_lines GATEWAY) 2>&1 &
 gateway_pid=$!

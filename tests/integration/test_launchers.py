@@ -62,12 +62,13 @@ def test_argument_and_missing_binary_errors():
 
 
 @pytest.mark.integration
-def test_two_terminal_event_flow_and_shutdown():
+@pytest.mark.parametrize("profile_args", [[], ["--someip-profile", "pi"]])
+def test_two_terminal_event_flow_and_shutdown(profile_args):
     interface = os.environ.get("CAN_INTERFACE", "vcan0")
     if not (Path("/sys/class/net") / interface).exists():
         pytest.skip(f"{interface} unavailable")
     server = subprocess.Popen(
-        [str(SERVER), "--scenario", "acceleration", "--interval", "0.2",
+        [str(SERVER), *profile_args, "--scenario", "acceleration", "--interval", "0.2",
          "--interface", interface],
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
@@ -94,6 +95,29 @@ def test_two_terminal_event_flow_and_shutdown():
             pytest.fail("server launcher hung on SIGINT")
     assert server.returncode == 130
     assert all(not process_exists(pid) for pid in child_pids)
+
+
+@pytest.mark.integration
+def test_server_hangup_stops_gateway_and_ecu():
+    server = subprocess.Popen(
+        [str(SERVER), "--someip-profile", "pi", "--scenario", "acceleration"],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+    )
+    try:
+        prefix = wait_for_text(server, b"Server running")
+        child_pids = [int(value) for value in re.findall(
+            rb"(?:Gateway|ECU) PID: (\d+)", prefix
+        )]
+        assert len(child_pids) == 2
+        server.send_signal(signal.SIGHUP)
+        output, _ = server.communicate(timeout=6)
+        assert server.returncode == 129, output.decode(errors="replace")
+        assert all(not process_exists(pid) for pid in child_pids)
+    finally:
+        if server.poll() is None:
+            server.kill()
+            server.communicate()
 
 
 @pytest.mark.integration

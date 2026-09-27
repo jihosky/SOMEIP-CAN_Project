@@ -1,6 +1,9 @@
 set(MILESTONE1_CONFIG ${PROJECT_SOURCE_DIR}/config/can/milestone1.json)
+set(BODY_CONFIG ${PROJECT_SOURCE_DIR}/config/can/body.json)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${MILESTONE1_CONFIG})
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS ${BODY_CONFIG})
 file(READ ${MILESTONE1_CONFIG} MILESTONE1_JSON)
+file(READ ${BODY_CONFIG} BODY_JSON)
 string(JSON M1_CAN_ID GET "${MILESTONE1_JSON}" can_id)
 string(JSON M1_DLC GET "${MILESTONE1_JSON}" dlc)
 string(JSON M1_BYTE_ORDER GET "${MILESTONE1_JSON}" byte_order)
@@ -20,6 +23,20 @@ configure_file(
     ${PROJECT_BINARY_DIR}/generated/milestone1_definition.hpp
     @ONLY
 )
+string(JSON BODY_CAN_ID GET "${BODY_JSON}" can_id)
+string(JSON BODY_DLC GET "${BODY_JSON}" dlc)
+string(JSON BODY_COMMAND_CAN_ID GET "${BODY_JSON}" command_can_id)
+string(JSON BODY_COMMAND_DLC GET "${BODY_JSON}" command_dlc)
+foreach(SIGNAL DRIVER_DOOR_OPEN PASSENGER_DOOR_OPEN REAR_LEFT_DOOR_OPEN
+               REAR_RIGHT_DOOR_OPEN TRUNK_OPEN DOORS_LOCKED HEADLIGHTS_ON)
+    string(TOLOWER "${SIGNAL}" signal_name)
+    string(JSON BODY_${SIGNAL}_BIT GET "${BODY_JSON}" ${signal_name}_bit)
+endforeach()
+configure_file(
+    ${PROJECT_SOURCE_DIR}/config/can/body_definition.hpp.in
+    ${PROJECT_BINARY_DIR}/generated/body_definition.hpp
+    @ONLY
+)
 
 add_library(can_frame_format STATIC src/frame_format.cpp)
 target_include_directories(can_frame_format PUBLIC include)
@@ -30,6 +47,9 @@ target_include_directories(socketcan_receiver_core PUBLIC include)
 add_library(signal_decoder STATIC src/signal_decoder.cpp)
 target_include_directories(signal_decoder PUBLIC include ${PROJECT_BINARY_DIR}/generated)
 target_link_libraries(signal_decoder PUBLIC vehicle_service)
+
+add_library(body_command_sender STATIC src/body_command_sender.cpp)
+target_include_directories(body_command_sender PUBLIC include ${PROJECT_BINARY_DIR}/generated)
 
 add_executable(socketcan_receiver src/socketcan_receiver.cpp)
 target_link_libraries(socketcan_receiver PRIVATE socketcan_receiver_core can_frame_format signal_decoder vehicle_service)

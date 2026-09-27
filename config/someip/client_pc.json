@@ -1,11 +1,17 @@
 {
-  "unicast": "192.168.50.2",
-  "logging": {"level": "error", "console": "true", "dlt": "false"},
+  "unicast": "192.168.50.1",
+  "logging": {
+    "level": "info",
+    "console": "true",
+    "dlt": "false"
+  },
   "applications": [
-    {"name": "vehicle-provider", "id": "0x6301"},
-    {"name": "vehicle-client", "id": "0x6302"}
+    {
+      "name": "vehicle-client",
+      "id": "0x6302"
+    }
   ],
-  "routing": "vehicle-provider",
+  "routing": "vehicle-client",
   "service-discovery": {
     "enable": "true",
     "multicast": "224.244.224.245",
