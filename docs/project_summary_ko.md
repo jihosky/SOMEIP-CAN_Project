@@ -205,3 +205,14 @@ SocketCAN은 Linux 소켓과 프레임 수신을 담당하고 디코더는 CAN �
 ## 15. 현재 상태 한 줄 요약
 
 현재 vCAN 기반 동적 차량 데이터를 C++ 게이트웨이에서 처리하여 SOME/IP 메서드와 이벤트로 전달하는 종단 간 차량 소프트웨어 경로를 구현하고 로컬 환경에서 검증했다.
+
+## Pi 통합 커밋 이후 PC 후속 검증
+
+`origin/feat/pi-vehicle-state-streaming`의 `98f203c`를 fetch하고 Pi 검증 문서를
+확인했다. PC HEAD `56ec470`을 유지했으며 merge/checkout은 하지 않았다.
+실제 Ethernet 연속 구독 12초 이상·13개 순환 샘플, SIGINT 종료 코드 0·잔여 PID 없음,
+직후 Method 회귀(60 km/h, 2400 rpm, 72 C)를 확인했다.
+PC diagnosis를 client ID 0x6302의 접두부 0x63과 일치시켜 Invalid client id를
+기존 3건에서 0건으로 제거했다. 테스트 16개 통과·6개 건너뜀, CTest 4개 통과.
+PC Wireshark 신규 캡처 및 device-bind/reliability fallback 경고는 미해결이다.
+[상세 PC 검증 기록](pc_vehicle_state_validation_2026-09-27.md).

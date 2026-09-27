@@ -56,3 +56,11 @@ def test_multi_host_service_and_event_contract():
         assert (discovery["multicast"], discovery["port"], discovery["protocol"]) == (
             "224.244.224.245", "30490", "udp"
         )
+
+
+def test_remote_client_diagnosis_matches_static_client_id():
+    for name in ("client_pc.json", "client_office.json"):
+        config = profile(name)
+        client_id = int(config["applications"][0]["id"], 16)
+        mask = int(config["diagnosis_mask"], 16)
+        assert (client_id & mask) >> 8 == int(config["diagnosis"], 16)

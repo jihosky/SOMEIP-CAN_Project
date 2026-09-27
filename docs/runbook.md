@@ -465,3 +465,12 @@ received three samples; continuous subscription received six cyclic samples
 was observed and SIGINT exited with code 0. Pi ran its existing compatible provider;
 this session did not rebuild/deploy its repository. No new Wireshark/tcpdump capture
 was made, so the individual SD packet sequence remains unverified in a capture.
+
+### PC follow-up after Pi integration commit 98f203c
+
+See [PC validation report](pc_vehicle_state_validation_2026-09-27.md): 12+ second
+continuous Ethernet subscription (13 ordered events), SIGINT exit 0/no stale PID,
+and immediate method regression passed. PC multi-host profiles explicitly set
+`diagnosis=0x63`, `diagnosis_mask=0xFF00` to match client ID 0x6302; A/B testing
+removed three Invalid client id diagnostics. Do not copy this diagnosis to Pi.
+Device-bind/reliability-fallback warnings and separate PC Wireshark remain outstanding.

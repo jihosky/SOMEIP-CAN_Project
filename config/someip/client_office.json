@@ -25,5 +25,7 @@
     "cyclic_offer_delay": "1000"
   },
   "netmask": "255.255.255.0",
-  "device": "eth0"
+  "device": "eth0",
+  "diagnosis": "0x63",
+  "diagnosis_mask": "0xFF00"
 }
