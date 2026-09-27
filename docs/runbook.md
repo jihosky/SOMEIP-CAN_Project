@@ -1,6 +1,6 @@
 # Milestone 2C runbook
 
-For current workplace body-control and GUI commands, see [한국어 실행 명령](commands_ko.md). The 192.168.50.x examples below document the earlier home-network verification.
+For current home/work commands, see [한국어 실행 명령](commands_ko.md). Both locations now use Pi `192.168.137.2` and PC/WSL `192.168.137.1`. Replace old Windows SD rules using [방화벽 교체 절차](windows_firewall_ko.md). Historical measurements below retain their original addresses.
 
 Run these commands on Linux or WSL from the repository root. The examples use /home/jiho/Portfolio/SOMEIP-CAN_Project; change that path if your checkout is elsewhere. The two-terminal launchers are the preferred manual check. The original five-terminal procedure remains below for debugging.
 
@@ -109,7 +109,7 @@ It needs the same built binaries, Python environment, vSomeIP runtime, and preco
 
 2026-09-23에 **Pi 제공자 → 직접 Ethernet → PC/WSL 클라이언트**를 실측했다. Pi 소유자가 `192.168.50.2:30540` LISTEN과 `eth0`의 UDP 30490 SD 송신을 확인했다. Windows가 Pi의 UDP 30490 패킷을 수신했고, WSL의 `vehicle-client`가 `0x6301/0x0001` 서비스를 발견하여 메서드 세 값과 가속 이벤트 세 개를 수신했다. 이번 검증은 직접 연결·이 주소 조합에서의 동작이며 장시간 안정성이나 다른 네트워크에서는 아직 확인하지 않았다.
 
-로컬 기본 프로필은 `config/someip/provider.json`과 `client.json`으로 루프백 `127.0.0.1`을 사용한다. 멀티 호스트 프로필은 `provider_pi.json`의 `192.168.50.2/24` 및 `client_pc.json`의 `192.168.50.1/24`를 사용한다. 각 호스트의 `routing`은 해당 호스트의 애플리케이션(`vehicle-provider` 또는 `vehicle-client`)이다. WSL 실측 주소는 `eth0=192.168.50.1/24`이고 Windows Ethernet에도 같은 주소가 있다. WSL은 mirrored 네트워킹을 사용한다. 직접 Ethernet의 인터페이스 이름은 양쪽 모두 `eth0`였다. 다른 이름·주소를 쓰면 JSON의 `unicast`/`device`와 런처의 사전 검사를 함께 조정해야 한다.
+로컬 기본 프로필은 `config/someip/provider.json`과 `client.json`으로 루프백 `127.0.0.1`을 사용한다. 멀티 호스트 프로필은 `provider_pi.json`의 `192.168.137.2/24` 및 `client_pc.json`의 `192.168.137.1/24`를 사용한다. 각 호스트의 `routing`은 해당 호스트의 애플리케이션(`vehicle-provider` 또는 `vehicle-client`)이다. 현재 필요한 WSL 주소는 `eth0=192.168.137.1/24`이고 Windows Ethernet에도 같은 주소가 있다. WSL은 mirrored 네트워킹을 사용한다. 직접 Ethernet의 인터페이스 이름은 양쪽 모두 `eth0`였다. 다른 이름·주소를 쓰면 JSON의 `unicast`/`device`와 런처의 사전 검사를 함께 조정해야 한다.
 
 실험 중 WSL의 SD 멀티캐스트 경로가 `eth0`에서 `eth1`로 되돌아가고, Pi ping이 일시적으로 끊긴 적이 있다. 링크가 재설정된 뒤에는 경로와 Pi 제공자 상태를 **클라이언트 실행 직전 다시 확인**한다. Windows Public 및 WSL Hyper-V의 기본 인바운드는 `Block`이었다. Pi 주소와 UDP 30490에 한정한 아래 두 허용 규칙을 적용한 후 Windows에서 SD 패킷 수신과 WSL 메서드·이벤트가 성공했다.
 
@@ -139,12 +139,12 @@ ip -details link show vcan0
 
 ~~~sh
 ip -brief -4 addr show dev eth0
-ip route get 192.168.50.2
+ip route get 192.168.137.2
 ip route get 224.244.224.245
 ip maddr show dev eth0
 ~~~
 
-Pi의 `eth0`에는 `192.168.50.2/24`, PC/WSL의 `eth0`에는 `192.168.50.1/24`가 있어야 한다. 두 호스트 모두 `ip route get 224.244.224.245`에 `dev eth0`가 나타나야 한다. 다른 장치가 나오면 해당 호스트에서 의도적으로 멀티캐스트 경로를 설정하고 다시 확인한다.
+Pi의 `eth0`에는 `192.168.137.2/24`, PC/WSL의 `eth0`에는 `192.168.137.1/24`가 있어야 한다. 두 호스트 모두 `ip route get 224.244.224.245`에 `dev eth0`가 나타나야 한다. 다른 장치가 나오면 해당 호스트에서 의도적으로 멀티캐스트 경로를 설정하고 다시 확인한다.
 
 ~~~sh
 sudo ip route replace 224.244.224.245/32 dev eth0
@@ -176,7 +176,7 @@ ss -lunp '( sport = :30490 )'
 ip maddr show dev eth0
 ~~~
 
-`ss -lntp`에는 게이트웨이가 소유한 `192.168.50.2:30540` TCP `LISTEN`이 기대된다. SD가 정상 시작되면 UDP 30490 바인딩과 `eth0`의 멀티캐스트 가입도 확인한다. vSomeIP 버전·소켓 표시 방식에 따라 UDP 로컬 주소는 `0.0.0.0:30490` 또는 `192.168.50.2:30490`처럼 다를 수 있다. `sudo ss -lntup`로 소유 프로세스 표시를 보완한다. 런처의 게이트웨이 PID를 읽어 실제 프로세스 환경을 확인할 수도 있다.
+`ss -lntp`에는 게이트웨이가 소유한 `192.168.137.2:30540` TCP `LISTEN`이 기대된다. SD가 정상 시작되면 UDP 30490 바인딩과 `eth0`의 멀티캐스트 가입도 확인한다. vSomeIP 버전·소켓 표시 방식에 따라 UDP 로컬 주소는 `0.0.0.0:30490` 또는 `192.168.137.2:30490`처럼 다를 수 있다. `sudo ss -lntup`로 소유 프로세스 표시를 보완한다. 런처의 게이트웨이 PID를 읽어 실제 프로세스 환경을 확인할 수도 있다.
 
 ~~~sh
 tr '\0' '\n' < /proc/GATEWAY_PID/environ | grep -E '^VSOMEIP_(CONFIGURATION|APPLICATION_NAME)='
@@ -219,10 +219,10 @@ WSL 클라이언트 실행 중에는 `ss -lunp '( sport = :30490 )'`에서 `192.
 | 관찰 | 우선 확인 |
 | --- | --- |
 | 디코딩 값은 나오지만 `registered`가 없음 | vSomeIP 초기화·라우팅 매니저 충돌, 실제 설정 경로, 프로세스가 계속 실행 중인지, `debug` 로그 |
-| `registered`/Offer 로그는 있으나 TCP 30540 `LISTEN` 없음 | `services`의 `0x6301/0x0001`과 `reliable: 30540`, `192.168.50.2` 바인딩, 포트 점유·오류 로그 |
+| `registered`/Offer 로그는 있으나 TCP 30540 `LISTEN` 없음 | `services`의 `0x6301/0x0001`과 `reliable: 30540`, `192.168.137.2` 바인딩, 포트 점유·오류 로그 |
 | TCP는 열렸으나 Pi eth0에 UDP 30490 송신 없음 | Pi의 `ip route get 224.244.224.245`, `device`/unicast 주소, SD 활성화, UDP 바인딩·라우팅 로그, 다른 인터페이스의 `tcpdump -ni any udp port 30490` |
 | Pi에는 SD가 보이지만 PC에는 없음 | Ethernet 멀티캐스트 전달, mirrored WSL과 Windows 방화벽, 양쪽 `ip maddr`와 경로. 일반 사용자 `tcpdump`는 권한 오류가 나므로 `sudo tcpdump`를 사용 |
-| PC에 SD는 보이나 서비스 불가 | PC 설정 로드·라우팅 매니저, SD 구독, 클라이언트의 `192.168.50.1` 바인딩, TCP 30540 연결 |
+| PC에 SD는 보이나 서비스 불가 | PC 설정 로드·라우팅 매니저, SD 구독, 클라이언트의 `192.168.137.1` 바인딩, TCP 30540 연결 |
 | 다른 라우팅 매니저 실행 중 | `pgrep -af 'vehicle_gateway|vehicle_data_provider|vehicle_data_client'`로 확인하고 본인이 시작한 충돌 프로세스만 정상 종료 |
 
 Windows mirrored WSL의 인바운드 정책은 관리자 권한이 없어도 읽기 전용 PowerShell에서 확인할 수 있다. 2026-09-23 처음에는 Windows Ethernet이 Public 프로필이고, 적용 중인 Public 및 WSL Hyper-V 인바운드 기본 동작이 모두 `Block`이었으며 UDP 30490 허용 규칙이 없었다. 같은 Pi 송신 조건에서 두 규칙을 추가한 후 Windows 수신과 WSL 요청·구독이 성공했다. 이는 이번 환경에서 인바운드 방화벽 설정이 SD 수신을 막았다는 **전후 비교 증거**다. 링크 및 멀티캐스트 경로의 일시적 변화도 별도로 관찰됐다.
@@ -233,14 +233,7 @@ Get-NetFirewallHyperVVMSetting -PolicyStore ActiveStore -Name '{40E0AC32-46A5-43
 Get-NetFirewallHyperVRule -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}'
 ~~~
 
-네트워크 관리자와 협의하여 필요할 때만 **관리자 PowerShell**에서 Pi 주소와 UDP 30490으로 한정한 규칙을 적용한다. 기존 규칙 이름이 없는지 먼저 확인한다.
-
-~~~powershell
-New-NetFirewallRule -DisplayName 'SOMEIP SD Pi to PC' -Direction Inbound -Action Allow -Profile Public -Protocol UDP -LocalAddress 192.168.50.1 -LocalPort 30490 -RemoteAddress 192.168.50.2
-New-NetFirewallHyperVRule -Name 'SOMEIP-SD-WSL' -DisplayName 'SOMEIP SD Pi to WSL' -Direction Inbound -Action Allow -VMCreatorId '{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}' -Protocol UDP -LocalPorts 30490 -RemoteAddresses 192.168.50.2
-~~~
-
-실험 후 규칙이 불필요하면 관리자 PowerShell에서 `Remove-NetFirewallRule -DisplayName 'SOMEIP SD Pi to PC'`와 `Remove-NetFirewallHyperVRule -Name 'SOMEIP-SD-WSL'`로 직접 제거한다. WSL의 `tcpdump`에는 별도로 Linux 관리자 권한이 필요하다.
+기존 규칙 제거와 새 IP 적용은 [Windows 방화벽 교체 절차](windows_firewall_ko.md)를 따른다. 새 주소에서의 패킷·메서드·이벤트 재검증은 아직 수행하지 않았다.
 
 방화벽은 `sudo nft list ruleset` 또는 사용 중인 방화벽 도구로 점검한다. 직접 연결 ping 성공은 유니캐스트 IP만 검증하며 SD 멀티캐스트 성공을 뜻하지 않는다. 종료할 때는 PC 클라이언트 완료를 확인한 뒤 Pi 터미널 2에서 Ctrl+C로 런처와 그 자식 ECU·게이트웨이를 종료하고, 마지막에 양쪽 `tcpdump`를 Ctrl+C로 멈춘다. `vcan0`와 수동으로 추가한 멀티캐스트 경로는 자동 제거되지 않는다.
 
@@ -370,3 +363,105 @@ After the event client exits, press Ctrl+C in Terminal 2 to stop the ECU, then C
 | Routing manager conflict | Only one process should own the configured vehicle-provider routing manager. Stop another vehicle_gateway or vehicle_data_provider with Ctrl+C. Inspect running processes with pgrep -af 'vehicle_gateway|vehicle_data_provider|vehicle_data_client'. |
 
 For an automated check after the manual run, use ./.venv/bin/python -m pytest tests/integration/test_someip_events.py -m integration -q with vcan0 up and no manually running gateway or client.
+
+## VehicleState continuous streaming — current manual procedure
+
+Prerequisites: same repository/config on both hosts; C++17 compiler, CMake 3.20+,
+Ninja, installed vSomeIP3 development/runtime; Pi vcan0 UP and Python environment
+with python-can. PC Python/pytest is needed for tests. Windows mirrored WSL must
+have eth0=192.168.137.1/24; Pi eth0=192.168.137.2/24. Apply the scoped rules in
+[Windows firewall guide](windows_firewall_ko.md). Stop other vehicle-client processes
+before running each test because these profiles share one application/routing ID.
+
+Build on each host from repository root:
+~~~sh
+cmake -S . -B build -G Ninja
+cmake --build build
+ctest --test-dir build --output-on-failure
+PYTHONPATH=python ./.venv/bin/python -m pytest tests/python tests/integration -q
+~~~
+Tests requiring vCAN skip if it is missing; the local domain-sample stream fixture
+exercises the production SOME/IP provider and client without CAN.
+
+On both hosts check `ip -4 addr` and `ip route get 224.244.224.245`. If SD uses the
+wrong device, run `sudo ip route replace 224.244.224.245/32 dev eth0`.
+
+**Pi terminal 1:**
+~~~sh
+# Only if vcan0 does not exist:
+sudo modprobe vcan
+sudo ip link add dev vcan0 type vcan
+sudo ip link set dev vcan0 up
+./scripts/run_vehicle_server.sh --someip-profile pi --scenario acceleration --interval 1.0
+~~~
+Check application vehicle-provider, provider_pi.json, registered, offer_service
+requested and decoded samples. There is no change required to the working provider
+publication implementation for this milestone.
+
+**PC/WSL terminal 1:**
+~~~sh
+./scripts/run_vehicle_client.sh --someip-profile pc method
+./scripts/run_vehicle_client.sh --someip-profile pc subscribe 3
+./scripts/run_vehicle_client.sh --someip-profile pc subscribe
+~~~
+The last command runs until Ctrl+C. Expected application lines:
+~~~text
+VehicleState service available
+VehicleState subscription requested: event 0x8001/group 0x0001
+Subscribed to VehicleData events (VehicleState subscription ACK)
+VehicleData event: speed=20.00 km/h rpm=1200 coolant=70 C
+VehicleData event: speed=40.00 km/h rpm=1800 coolant=71 C
+VehicleData event: speed=60.00 km/h rpm=2400 coolant=72 C
+~~~
+Starting sample varies with subscription time. Verify cyclic ordering over three
+samples. Existing VehicleData log spelling is retained for scripts and parsers.
+For client-first startup, start continuous subscribe before the Pi server; it waits
+without the finite client's timeout. Provider exit should report unavailable after
+SD stop-offer/expiry. Stop PC with Ctrl+C then Pi with Ctrl+C. Routes/vcan persist.
+
+**GUI alternative (after stopping the CLI subscriber):**
+~~~sh
+./scripts/run_vehicle_dashboard.sh --someip-profile pc
+~~~
+Open http://127.0.0.1:8765. Vehicle values arrive through the existing event bridge;
+body state and commands remain available. Browser rendering is not a wire-level test.
+
+**Packet capture terminal on either host:**
+~~~sh
+sudo tcpdump -ni eth0 -s 0 -w /tmp/vehicle-state.pcap 'udp port 30490 or tcp port 30540'
+~~~
+Start capture before client startup; stop with Ctrl+C. Open pcap in Wireshark;
+use `udp.port == 30490 || tcp.port == 30540`, and Decode As SOME/IP for TCP 30540
+if automatic dissection is unavailable. Enable TCP reassembly. Expected sequence:
+
+1. Pi -> 224.244.224.245:30490 SD OfferService for 0x6301/0x0001.
+2. Client discovery may emit FindService (an already received Offer can suffice).
+3. PC -> Pi SD SubscribeEventgroup for group 0x0001.
+4. Pi -> PC SD SubscribeEventgroupAck (positive TTL; TTL zero indicates rejection).
+5. TCP stream Pi:30540 -> PC ephemeral port: SOME/IP NOTIFICATION (0x02),
+   service 0x6301, event/method field 0x8001, eight-byte payload.
+
+SD entry types are Offer=0x01, SubscribeEventgroup=0x06, Ack=0x07.
+A TCP packet may contain multiple notifications or a partial message; count reassembled
+SOME/IP messages, not packets. Application ACK logs alone do not prove captured SD packets.
+
+Troubleshooting: no availability -> check Pi process, ping, TCP listener and SD route/
+Windows firewall; request with no ACK -> inspect group IDs and SD packet exchange;
+ACK but no samples -> ensure ECU and CAN decoding run (no initial event replay);
+malformed event -> check exactly eight bytes and compatible codec; client ID conflict
+-> stop the other CLI/dashboard client. Slow finite tests need the executable's
+`--timeout SECONDS` (1–300); continuous mode has no data timeout. No event multicast,
+multi-subscriber reliability, loss detection or long-run recovery is claimed here.
+
+### Verification status for this change
+
+Local build/CTest 4 passed; pytest 15 passed, 6 skipped (no PC vCAN).
+Local provider/client tests include delayed provider startup and provider loss.
+The first Pi attempt timed out discovering the service. After the user confirmed
+provider/route readiness and stopped other PC clients, the actual Pi -> Ethernet ->
+PC retest passed: methods returned 40 km/h, 1800 rpm, 71 C; finite subscription
+received three samples; continuous subscription received six cyclic samples
+60/2400/72 -> 20/1200/70 -> 40/1800/71, repeated twice. Subscription ACK callback
+was observed and SIGINT exited with code 0. Pi ran its existing compatible provider;
+this session did not rebuild/deploy its repository. No new Wireshark/tcpdump capture
+was made, so the individual SD packet sequence remains unverified in a capture.

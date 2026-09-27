@@ -54,3 +54,43 @@ The event payload is eight bytes in **big-endian (network) order**:
 | 6–7 | Coolant temperature | Signed 16-bit two's-complement °C |
 
 This payload contains vehicle-domain values and has no CAN identifier, DLC, reserved CAN bytes, or CAN byte order. Every successfully decoded `VehicleData` sample triggers one event notification. The method payloads and identifiers remain unchanged.
+
+## VehicleState streaming (2026-09-27)
+
+VehicleState is the domain meaning of the existing VehicleData event; existing
+C++ names, CLI `VehicleData event:` output and wire contract stay compatible.
+Service `0x6301`, instance `0x0001`, event `0x8001`, eventgroup `0x0001`.
+Transport: reliable TCP 30540, unicast event delivery; SD uses UDP 30490 multicast
+224.244.224.245. BodyStatus remains a separate event `0x8002`/group `0x0002`.
+
+| Offset | Length | Encoding | Domain value |
+| --- | --- | --- | --- |
+| 0 | 4 | uint32 big-endian | speed in 0.01 km/h |
+| 4 | 2 | uint16 big-endian | engine RPM |
+| 6 | 2 | int16 two's complement big-endian | coolant Celsius |
+
+Exactly eight bytes; null, short and oversized payloads are rejected. No CAN ID,
+DLC, CAN layout, sequence number or source timestamp is transmitted. Speed uses
+round-to-nearest hundredth; nonfinite, negative or overflowing values are rejected
+by the encoder. Decoded VehicleData timestamp is default-initialized, not a source time.
+Example 20 km/h, 1200 rpm, 70 C: `00 00 07 D0 04 B0 00 46`.
+
+Every valid decoded CAN sample updates VehicleService and is passed as one coherent
+domain snapshot to provider.publish(). notify(force=true) also publishes repeated
+values: this is **sample-driven**, not value-change-driven or timer-driven.
+No subscriber/GUI is needed to update the authoritative VehicleService. ET_EVENT
+has no promised initial replay; a new subscriber waits for the next sample.
+Methods remain independent on-demand reads. A three-method sequence need not be
+one atomic snapshot, whereas each event contains one coherent sample.
+
+Continuous `subscribe` requests the reliable event after application registration,
+subscribes on availability and prints a success line only on the subscription-status
+callback with status zero. The callback is application evidence, not a packet capture.
+Non-notification/wrong-return-code messages are ignored; malformed notification
+payloads exit cleanly with code 1. Finite `subscribe N` retains a 15-second overall
+launcher deadline; continuous mode waits indefinitely, including before provider
+startup. On service loss it reports unavailable and requests a subscription on
+availability again; no replay, loss accounting or full fault recovery is promised.
+SIGINT/SIGTERM stop the runtime through the client supervisor; no signal handler
+calls vSomeIP directly. The 100ms supervisor wait is solely for lifecycle handling,
+not polling vehicle data. Continuous launcher execs the client to preserve PID ownership.

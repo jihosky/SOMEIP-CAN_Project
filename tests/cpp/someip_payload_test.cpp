@@ -1,4 +1,5 @@
 #include "vehicle_someip/payload_codec.hpp"
+#include "vehicle_someip/identifiers.hpp"
 
 #include <cmath>
 #include <cstdint>
@@ -9,6 +10,8 @@
 
 int main() {
     using namespace vehicle_someip;
+    static_assert(service_id == 0x6301 && instance_id == 0x0001);
+    static_assert(vehicle_data_event_id == 0x8001 && vehicle_data_eventgroup_id == 0x0001);
     const std::vector<std::uint8_t> speed{0x00, 0x00, 0x30, 0x39};
     const std::vector<std::uint8_t> rpm{0x09, 0xC4};
     const std::vector<std::uint8_t> temperature{0xFF, 0xD8};
@@ -50,7 +53,9 @@ int main() {
     const auto decoded = decode_vehicle_data(vehicle.data(), vehicle.size());
     if (!decoded || decoded->vehicle_speed_kph != 123.45 ||
         decoded->engine_rpm != 2500 || decoded->coolant_temperature_c != 85 ||
-        decode_vehicle_data(vehicle.data(), 7)) {
+        decode_vehicle_data(vehicle.data(), 7) ||
+        decode_vehicle_data(vehicle.data(), 9) ||
+        decode_vehicle_data(nullptr, 8)) {
         std::cerr << "Incorrect VehicleData event decoding\n";
         return 1;
     }

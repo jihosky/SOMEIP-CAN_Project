@@ -24,9 +24,12 @@ case "$mode" in
     subscribe|body-subscribe)
         if (($# > 1)); then usage >&2; exit 2; fi
         count="${1:-3}"
-        if [[ ! "$count" =~ ^[0-9]+$ ]] || ((10#$count < 1 || 10#$count > 10000)); then
-            printf '[CLIENT] Event count must be an integer from 1 to 10000\n' >&2
-            exit 2
+        if [[ "$mode" == subscribe && $# == 0 ]]; then count=continuous; fi
+        if [[ "$count" != continuous || $# != 0 ]]; then
+            if [[ ! "$count" =~ ^[0-9]+$ ]] || ((10#$count < 1 || 10#$count > 10000)); then
+                printf '[CLIENT] Event count must be an integer from 1 to 10000\n' >&2
+                exit 2
+            fi
         fi ;;
     door)
         if (($# != 2)) || [[ ! "$1" =~ ^[0-4]$ ]] || [[ "$2" != open && "$2" != close ]]; then
@@ -66,7 +69,12 @@ printf '[CLIENT] SOME/IP profile: %s; config: %s; application: %s\n' \
     "$someip_profile" "$VSOMEIP_CONFIGURATION" "$VSOMEIP_APPLICATION_NAME"
 case "$mode" in
     method) arguments=(--timeout 5) ;;
-    subscribe) arguments=(--timeout 15 --subscribe "$count") ;;
+    subscribe)
+        if [[ "$count" == continuous ]]; then
+            # Own the runtime directly so SIGINT/SIGTERM cannot orphan a pipeline child.
+            exec "$client_bin" --subscribe
+        fi
+        arguments=(--timeout 15 --subscribe "$count") ;;
     body) arguments=(read) ;;
     body-subscribe) arguments=(subscribe "$count") ;;
     door) arguments=(door "$door_index" "$door_action") ;;

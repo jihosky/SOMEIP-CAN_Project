@@ -64,3 +64,17 @@ The provider offers event `0x8001` in event group `0x0001`. The client requests 
 ## Boundaries for later milestones
 
 The CAN gateway owns raw frames and decoding. The `vehicle_service` layer owns stable vehicle concepts and is the boundary presented to SOME/IP services. The SOME/IP provider and client handle transport, while the AI agent will consume only a high-level vehicle API. Raw CAN frames and SOME/IP messages will not enter the AI layer. See [ADR 0002](decisions/0002-layer-boundaries.md) and [ADR 0003](decisions/0003-use-vsomeip.md).
+
+## VehicleState event stream
+
+The existing CAN callback already performs decode -> VehicleService update ->
+provider.publish(domain snapshot) -> notify. Keep this sample-driven path and
+VehicleData type, codec and IDs; VehicleState names the coherent domain stream.
+No provider timer or GUI dependency is introduced. Explicit method reads coexist.
+The PC dashboard C++ bridge receives/decodes real event notifications and emits
+high-level records to Python VehicleFeed, which updates its locked application state.
+The browser still fetches that cached HTTP state every 500ms; this is presentation
+polling, not SOME/IP method polling. Browser push/SSE is deferred to avoid replacing
+a working GUI transport. No GUI CAN knowledge or direct vSomeIP dependency is added.
+The previously identified stale display on HTTP disconnect and delayed door-ACK
+correlation issues remain outside this vehicle streaming change.

@@ -1,4 +1,4 @@
-"""Keep local, home, and workplace vSomeIP network profiles distinct."""
+"""Keep loopback isolated and home/work network profiles identical."""
 
 import json
 from pathlib import Path
@@ -11,10 +11,6 @@ def profile(name):
     return json.loads((CONFIG / name).read_text())
 
 
-def without_address(config):
-    return {key: value for key, value in config.items() if key != "unicast"}
-
-
 def test_local_profiles_remain_loopback():
     provider = profile("provider.json")
     client = profile("client.json")
@@ -23,17 +19,17 @@ def test_local_profiles_remain_loopback():
     assert client["routing"] == "vehicle-provider"
 
 
-def test_home_and_work_profiles_differ_only_in_ip():
+def test_home_and_work_profiles_use_unified_addresses():
     home_provider = profile("provider_pi.json")
     work_provider = profile("provider_office.json")
     home_client = profile("client_pc.json")
     work_client = profile("client_office.json")
-    assert home_provider["unicast"] == "192.168.50.2"
-    assert home_client["unicast"] == "192.168.50.1"
-    assert work_provider["unicast"] == "192.168.137.69"
+    assert home_provider["unicast"] == "192.168.137.2"
+    assert home_client["unicast"] == "192.168.137.1"
+    assert work_provider["unicast"] == "192.168.137.2"
     assert work_client["unicast"] == "192.168.137.1"
-    assert without_address(home_provider) == without_address(work_provider)
-    assert without_address(home_client) == without_address(work_client)
+    assert home_provider == work_provider
+    assert home_client == work_client
 
 
 def test_multi_host_service_and_event_contract():

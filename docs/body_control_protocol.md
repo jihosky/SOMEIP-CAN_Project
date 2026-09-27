@@ -27,7 +27,7 @@ the selected CAN interface starts with `vcan`; physical CAN interfaces do not
 send body commands. The demo has no per-client authentication, so keep remote
 control on the intended test network.
 
-On the Pi at the workplace, with `eth0=192.168.137.69` and the SD multicast
+On the Pi at home or work, with `eth0=192.168.137.2` and the SD multicast
 route through eth0, start:
 
 ~~~sh
@@ -35,9 +35,9 @@ route through eth0, start:
 ~~~
 
 The client launcher offers `body`, `body-subscribe [COUNT]`, and
-`door INDEX open|close` modes. `client_pc.json` retains the home address
-`192.168.50.1`; `client_office.json` uses the workplace PC/WSL address
-`192.168.137.1`. After checking the PC network, run:
+`door INDEX open|close` modes. Both `client_pc.json` and `client_office.json`
+use `192.168.137.1`; both provider profiles use `192.168.137.2`.
+After checking the PC network, run:
 
 ~~~sh
 ./scripts/run_vehicle_client.sh --someip-profile work body
