@@ -465,3 +465,30 @@ received three samples; continuous subscription received six cyclic samples
 was observed and SIGINT exited with code 0. Pi ran its existing compatible provider;
 this session did not rebuild/deploy its repository. No new Wireshark/tcpdump capture
 was made, so the individual SD packet sequence remains unverified in a capture.
+
+
+### Pi integration validation (2026-09-27)
+
+The integration branch `feat/pi-vehicle-state-streaming` starts at PC streaming
+commit `56ec470` and selectively preserves Pi runtime changes from `8d00e0d`.
+Use `--someip-profile pi` for `provider_pi.json` (192.168.137.2); `work` selects
+`provider_office.json`, currently also 192.168.137.2. The default/local profile
+remains loopback. Historical Pi commands are archived under
+`docs/history/pi-runtime-2026-09-27/`; their old profile meanings are not current.
+
+```sh
+# Pi: start one provider only
+./scripts/run_vehicle_server.sh --someip-profile pi --scenario acceleration --interface vcan0 --interval 1.0
+# In another terminal, if the launcher terminal is lost:
+./scripts/stop_vehicle_server.sh
+```
+
+Ctrl+C, TERM and terminal HUP trigger launcher cleanup of its gateway/ECU.
+Startup rejects an already running vehicle_gateway. The stop script checks the
+executable path before stopping this checkout's gateway/launcher.
+
+Pi build and CTest passed (4/4); Python/integration tests passed (22, zero skips).
+Actual eth0 capture and PC logs confirm Offer, group 0x0001 Subscribe/Ack and
+three 0x8001 TCP notifications with the expected eight-byte big-endian payload.
+This session's PC continuous Ctrl+C/exit/process check and separate Wireshark
+confirmation remain pending. See [the validation report](pi_vehicle_state_validation_2026-09-27.md).

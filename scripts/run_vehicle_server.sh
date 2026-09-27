@@ -23,7 +23,10 @@ stop_child() {
 }
 cleanup() {
     local status=$? pid attempt
-    trap - EXIT INT TERM
+    trap - EXIT INT TERM HUP
+    if [[ -n "$ecu_pid" || -n "$gateway_pid" ]]; then
+        log "Stopping server processes (gateway=${gateway_pid:-none}, ECU=${ecu_pid:-none})..."
+    fi
     stop_child "$ecu_pid"
     stop_child "$gateway_pid"
     for pid in "$ecu_pid" "$gateway_pid"; do
@@ -38,11 +41,15 @@ cleanup() {
         fi
         wait "$pid" 2>/dev/null || true
     done
+    if [[ -n "$ecu_pid" || -n "$gateway_pid" ]]; then
+        log "Server processes stopped."
+    fi
     exit "$status"
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+trap 'exit 129' HUP
 
 while (($#)); do
     case "$1" in
@@ -88,6 +95,15 @@ if [[ ! -x "$gateway_bin" ]]; then
     printf '[SETUP] Gateway executable missing: %s\n' "$gateway_bin" >&2
     printf '[SETUP] Build it with: cmake -S . -B build -G Ninja && cmake --build build\n' >&2
     exit 1
+fi
+if command -v pgrep >/dev/null 2>&1; then
+    existing_gateway_pids="$(pgrep -x vehicle_gateway || true)"
+    if [[ -n "$existing_gateway_pids" ]]; then
+        printf '[SETUP] vehicle_gateway is already running (PID(s): %s).\n' \
+            "${existing_gateway_pids//$'\n'/, }" >&2
+        printf '[SETUP] Use the existing server, or stop its launcher with Ctrl+C before starting another.\n' >&2
+        exit 1
+    fi
 fi
 someip_config="$repo_root/config/someip/provider.json"
 if [[ "$someip_profile" == pi ]]; then someip_config="$repo_root/config/someip/provider_pi.json"; fi
